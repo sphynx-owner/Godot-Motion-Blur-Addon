@@ -1,0 +1,6 @@
+[gd_resource type="Resource" script_class="ShaderStageResource" load_steps=2 format=3 uid="uid://bidsfymvdyhek"]
+
+[ext_resource type="Script" uid="uid://defi5jlhkfhls" path="res://addons/sphynx_enhanced_compositor_toolkit/base_classes/shader_pass_resource.gd" id="1_e4xl1"]
+
+[resource]
+script = ExtResource("1_e4xl1")

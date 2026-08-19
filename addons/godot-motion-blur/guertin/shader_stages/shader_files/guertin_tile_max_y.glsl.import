@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://ceetvitdbio4l"
+path="res://.godot/imported/guertin_tile_max_y.glsl-3636424a09ef91c6773a70513bde0592.res"
+
+[deps]
+
+source_file="res://addons/godot-motion-blur/guertin/shader_stages/shader_files/guertin_tile_max_y.glsl"
+dest_files=["res://.godot/imported/guertin_tile_max_y.glsl-3636424a09ef91c6773a70513bde0592.res"]
+
+[params]
+

@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://bxoh2vy6m4s83"
+path="res://.godot/imported/pre_blur_processor.glsl-80fef5f9d9d353aa9a5ec3fddcbd5fb8.res"
+
+[deps]
+
+source_file="res://addons/godot-motion-blur/pre_blur_processing/shader_stages/shaders/pre_blur_processor.glsl"
+dest_files=["res://.godot/imported/pre_blur_processor.glsl-80fef5f9d9d353aa9a5ec3fddcbd5fb8.res"]
+
+[params]
+
