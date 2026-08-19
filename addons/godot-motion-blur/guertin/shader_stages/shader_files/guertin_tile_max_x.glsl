@@ -7,6 +7,7 @@
 layout(set = 0, binding = 0) uniform sampler2D velocity_sampler;
 layout(set = 0, binding = 1) uniform sampler2D depth_sampler;
 layout(rgba16f, set = 0, binding = 2) uniform writeonly image2D tile_max_x;
+// DEBUG_UNIFORMS
 
 layout(push_constant, std430) uniform Params 
 {	

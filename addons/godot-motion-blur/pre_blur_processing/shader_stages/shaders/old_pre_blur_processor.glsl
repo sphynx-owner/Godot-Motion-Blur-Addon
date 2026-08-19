@@ -7,6 +7,7 @@
 layout(set = 0, binding = 0) uniform sampler2D depth_sampler;
 layout(set = 0, binding = 1) uniform sampler2D vector_sampler;
 layout(rgba32f, set = 0, binding = 2) uniform writeonly image2D vector_output;
+// DEBUG_UNIFORMS
 
 struct SceneData {
 	mat4 projection_matrix;

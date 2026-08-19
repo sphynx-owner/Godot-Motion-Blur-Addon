@@ -11,6 +11,7 @@ layout(set = 0, binding = 2) uniform sampler2D neighbor_max;
 layout(set = 0, binding = 3) uniform sampler2D tile_variance;
 layout(rgba16f, set = 0, binding = 4) uniform writeonly image2D output_color;
 layout(set = 0, binding = 5) uniform sampler2D custom_curve;
+// DEBUG_UNIFORMS
 
 
 layout(push_constant, std430) uniform Params 

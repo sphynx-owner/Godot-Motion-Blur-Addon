@@ -1,5 +1,7 @@
 @tool
-extends "res://addons/sphynx_enhanced_compositor_toolkit/base_classes/enhanced_compositor_effect.gd"
+@abstract
+class_name MotionBlurCompositorEffect
+extends EnhancedCompositorEffect
 #class_name MotionBlurCompositor
 ## This class abstracts some of the default settings that are expected 
 ## from a motion blur compositor effect. 
@@ -48,7 +50,7 @@ const COLOR_OUTPUT_TEXTURE_NAME : StringName = "color_output"
 
 @export var support_fsr2 := true
 
-@export_storage var pre_blur_processor_stage : ShaderStageResource = preload("res://addons/sphynx_motion_blur_toolkit/pre_blur_processing/shader_stages/pre_blur_processing_stage.tres")
+@export_storage var pre_blur_processor_stage : ShaderStageResource = preload("res://addons/godot-motion-blur/pre_blur_processing/shader_stages/pre_blur_processing_stage.tres")
 
 @export_group("Movement Separation")
 

@@ -1,21 +1,21 @@
 @tool
-extends "res://addons/sphynx_motion_blur_toolkit/guertin/base_guertin_motion_blur.gd"
 class_name GuertinMotionBlur
+extends BaseGuertingMotionBlur
 
 const TILE_MAX_X_TEXTURE_NAME : StringName = "tile_max_x"
 const TILE_MAX_TEXTURE_NAME : StringName = "tile_max"
 const NEIGHBOR_MAX_TEXTURE_NAME : StringName = "neighbor_max"
 const TILE_VARIANCE_TEXTURE_NAME : StringName = "tile_variance"
 
-@export_storage var blur_stage : ShaderStageResource = preload("res://addons/sphynx_motion_blur_toolkit/guertin/shader_stages/guertin_blur_stage.tres")
+@export_storage var blur_stage : ShaderStageResource = preload("res://addons/godot-motion-blur/guertin/shader_stages/guertin_blur_stage.tres")
 
-@export_storage var overlay_stage : ShaderStageResource = preload("res://addons/sphynx_motion_blur_toolkit/guertin/shader_stages/guertin_overlay_stage.tres")
+@export_storage var overlay_stage : ShaderStageResource = preload("res://addons/godot-motion-blur/guertin/shader_stages/guertin_overlay_stage.tres")
 
-@export_storage var tile_max_x_stage : ShaderStageResource = preload("res://addons/sphynx_motion_blur_toolkit/guertin/shader_stages/guertin_tile_max_x_stage.tres")
+@export_storage var tile_max_x_stage : ShaderStageResource = preload("res://addons/godot-motion-blur/guertin/shader_stages/guertin_tile_max_x_stage.tres")
 
-@export_storage var tile_max_y_stage : ShaderStageResource = preload("res://addons/sphynx_motion_blur_toolkit/guertin/shader_stages/guertin_tile_max_y_stage.tres")
+@export_storage var tile_max_y_stage : ShaderStageResource = preload("res://addons/godot-motion-blur/guertin/shader_stages/guertin_tile_max_y_stage.tres")
 
-@export_storage var neighbor_max_stage : ShaderStageResource = preload("res://addons/sphynx_motion_blur_toolkit/guertin/shader_stages/guertin_neighbor_max_stage.tres")
+@export_storage var neighbor_max_stage : ShaderStageResource = preload("res://addons/godot-motion-blur/guertin/shader_stages/guertin_neighbor_max_stage.tres")
 
 var _previous_time : float = 0
 
