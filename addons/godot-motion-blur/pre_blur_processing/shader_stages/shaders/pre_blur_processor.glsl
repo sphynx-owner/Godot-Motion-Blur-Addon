@@ -230,7 +230,7 @@ void main()
 	// and the velocity vector would be flipped. (I am not 100% sure this is the whole story but this handles velocities
 	// that are extracted from the environment when the camera moves backwards rapidly, avoiding crazy artifacts)
 	// If degth == 0 (skybox), we use an arithmetic operation to generate a negative infinity float.
-	imageStore(vector_output, uvi, vec4(total_velocity * (view_past_ndc_cache.w < 0 ? -1 : 1), depth == 0 ? (-1.0 / 0.0) : view_position.z));
+	imageStore(vector_output, uvi, vec4(total_velocity * (view_past_ndc_cache.w < 0 ? -1 : 1) * vec3(render_size, 1.0), depth == 0 ? (-1.0 / 0.0) : view_position.z));
 
 #ifdef DEBUG
 	vec2 velocity = textureLod(vector_sampler, uvn, 0.0).xy;
@@ -238,7 +238,5 @@ void main()
 	velocity = velocity * clamp(velocity_length, 0, 10) / velocity_length;
 	imageStore(debug_6_image, uvi, vec4(velocity * (view_past_ndc_cache.w < 0 ? -1 : 1), view_past_ndc_cache.w < 0 ? 1 : 0, 1));
 	imageStore(debug_7_image, uvi, vec4(camera_uv_change.xy, 0, 1));
-
-	imageStore(debug_1_image, uvi, vec4(1.0));
 #endif
 }
