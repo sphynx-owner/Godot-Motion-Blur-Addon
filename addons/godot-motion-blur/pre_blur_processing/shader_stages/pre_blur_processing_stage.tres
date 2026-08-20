@@ -1,8 +1,0 @@
-[gd_resource type="Resource" script_class="ShaderStageResource" format=3 uid="uid://oekvkjd75764"]
-
-[ext_resource type="Script" uid="uid://defi5jlhkfhls" path="res://addons/easy-compositor/base_classes/shader_pass_resource.gd" id="1_pm6im"]
-[ext_resource type="RDShaderFile" uid="uid://bxoh2vy6m4s83" path="res://addons/godot-motion-blur/pre_blur_processing/shader_stages/shaders/pre_blur_processor.glsl" id="2_8yubi"]
-
-[resource]
-script = ExtResource("1_pm6im")
-shader_file = ExtResource("2_8yubi")

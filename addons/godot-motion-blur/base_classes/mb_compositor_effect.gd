@@ -50,7 +50,7 @@ const COLOR_OUTPUT_TEXTURE_NAME : StringName = "color_output"
 
 @export var support_fsr2 := true
 
-@export_storage var pre_blur_processor_stage : ShaderStageResource = preload("res://addons/godot-motion-blur/pre_blur_processing/shader_stages/pre_blur_processing_stage.tres")
+@export_storage var pre_blur_processor_stage: RDShaderFile = preload("res://addons/godot-motion-blur/pre_blur_processing/shader_stages/pre_blur_processor.glsl")
 
 @export_group("Movement Separation")
 

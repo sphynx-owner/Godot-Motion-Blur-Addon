@@ -1,8 +1,0 @@
-[gd_resource type="Resource" script_class="ShaderStageResource" format=3 uid="uid://bxfg45ubc2pv7"]
-
-[ext_resource type="Script" uid="uid://defi5jlhkfhls" path="res://addons/easy-compositor/base_classes/shader_pass_resource.gd" id="1_u1l7u"]
-[ext_resource type="RDShaderFile" uid="uid://ceetvitdbio4l" path="res://addons/godot-motion-blur/guertin/shader_stages/shader_files/guertin_tile_max_y.glsl" id="2_0vdmk"]
-
-[resource]
-script = ExtResource("1_u1l7u")
-shader_file = ExtResource("2_0vdmk")

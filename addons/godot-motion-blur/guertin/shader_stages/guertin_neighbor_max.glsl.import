@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://bn88jkvr17x4j"
+path="res://.godot/imported/guertin_neighbor_max.glsl-28d4745a1d933e2b68fef540a27ecd1c.res"
+
+[deps]
+
+source_file="res://addons/godot-motion-blur/guertin/shader_stages/guertin_neighbor_max.glsl"
+dest_files=["res://.godot/imported/guertin_neighbor_max.glsl-28d4745a1d933e2b68fef540a27ecd1c.res"]
+
+[params]
+

@@ -1,8 +1,0 @@
-[gd_resource type="Resource" script_class="ShaderStageResource" format=3 uid="uid://bkudf8hl37ho2"]
-
-[ext_resource type="Script" uid="uid://defi5jlhkfhls" path="res://addons/easy-compositor/base_classes/shader_pass_resource.gd" id="1_kvtxq"]
-[ext_resource type="RDShaderFile" uid="uid://dbt0noaywafgs" path="res://addons/godot-motion-blur/guertin/shader_stages/shader_files/guertin_sphynx_blur.glsl" id="2_awof1"]
-
-[resource]
-script = ExtResource("1_kvtxq")
-shader_file = ExtResource("2_awof1")
