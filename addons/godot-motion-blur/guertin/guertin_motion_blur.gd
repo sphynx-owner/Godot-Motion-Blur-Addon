@@ -103,10 +103,6 @@ func _enhanced_render_callback(render_size : Vector2i):
 		]
 	)
 	
-	# If you want to change this you must do so inside all compute shaders
-	# layouts
-	var compute_dispatch_group_size: Vector3i = Vector3i(16, 16, 1)
-	
 	rd.draw_command_begin_label("Pre Blur Processing", Color(1.0, 1.0, 1.0, 1.0))
 	
 	var depth_image: RID = get_depth_texture()
@@ -123,9 +119,8 @@ func _enhanced_render_callback(render_size : Vector2i):
 			#get_sampler_uniform(_stencil_texture.texture_rd_rid, 4)
 		],
 		pre_blur_push_constants,
-		get_groups_count(Vector3(render_size.x, render_size.y, 1), compute_dispatch_group_size), 
-		"Process Velocity Buffer", 
-		0
+		get_groups_count(Vector3(render_size.x, render_size.y, 1), DEFAULT_GROUP_SIZE), 
+		"Process Velocity Buffer"
 	)
 	
 	rd.draw_command_end_label()
@@ -152,9 +147,8 @@ func _enhanced_render_callback(render_size : Vector2i):
 			get_image_uniform(tile_max_x_image, 2)
 		],
 		tile_max_x_push_constants,
-		get_groups_count(Vector3(render_size.x / tile_size, render_size.y, 1), compute_dispatch_group_size), 
-		"TileMaxX", 
-		0
+		get_groups_count(Vector3(render_size.x / tile_size, render_size.y, 1), DEFAULT_GROUP_SIZE), 
+		"TileMaxX"
 	)
 	
 	dispatch_stage(
@@ -164,9 +158,8 @@ func _enhanced_render_callback(render_size : Vector2i):
 			get_image_uniform(tile_max_image, 1)
 		],
 		tile_max_y_push_constants,
-		get_groups_count(Vector3(render_size.x / tile_size, render_size.y / tile_size, 1), compute_dispatch_group_size), 
-		"TileMaxY", 
-		0
+		get_groups_count(Vector3(render_size.x / tile_size, render_size.y / tile_size, 1), DEFAULT_GROUP_SIZE), 
+		"TileMaxY"
 	)
 	
 	dispatch_stage(
@@ -176,9 +169,8 @@ func _enhanced_render_callback(render_size : Vector2i):
 			get_image_uniform(neighbor_max_image, 1)
 		],
 		neighbor_max_push_constants,
-		get_groups_count(Vector3(render_size.x / tile_size, render_size.y / tile_size, 1), compute_dispatch_group_size), 
-		"NeighborMax", 
-		0
+		get_groups_count(Vector3(render_size.x / tile_size, render_size.y / tile_size, 1), DEFAULT_GROUP_SIZE), 
+		"NeighborMax"
 	)
 	
 	dispatch_stage(
@@ -192,9 +184,8 @@ func _enhanced_render_callback(render_size : Vector2i):
 			get_sampler_uniform(custom_curve_texture_rd.texture_rd_rid, 5, true)
 		],
 		blur_push_constants,
-		get_groups_count(Vector3(render_size.x, render_size.y, 1), compute_dispatch_group_size), 
-		"Blur Reconstruction", 
-		0
+		get_groups_count(Vector3(render_size.x, render_size.y, 1), DEFAULT_GROUP_SIZE), 
+		"Blur Reconstruction"
 	)
 	
 	dispatch_stage(
@@ -204,9 +195,8 @@ func _enhanced_render_callback(render_size : Vector2i):
 			get_image_uniform(color_image, 1)
 		],
 		[],
-		get_groups_count(Vector3(render_size.x, render_size.y, 1), compute_dispatch_group_size), 
-		"Overlay result", 
-		0
+		get_groups_count(Vector3(render_size.x, render_size.y, 1), DEFAULT_GROUP_SIZE), 
+		"Overlay result"
 	)
 	
 	rd.draw_command_end_label()

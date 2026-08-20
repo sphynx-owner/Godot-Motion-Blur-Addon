@@ -86,7 +86,7 @@ func _init():
 	needs_motion_vectors = true
 	needs_normal_roughness = false
 	
-	_custom_curve_updated()
+	RenderingServer.call_on_render_thread(_custom_curve_updated)
 	
 	super()
 
