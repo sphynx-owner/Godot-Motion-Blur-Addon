@@ -6,8 +6,8 @@ extends EnhancedCompositorEffect
 ## This class abstracts some of the default settings that are expected 
 ## from a motion blur compositor effect. 
 
-const CUSTOM_VELOCITY_TEXTURE_NAME : StringName = "custom_velocity"
-const COLOR_OUTPUT_TEXTURE_NAME : StringName = "color_output"
+const CUSTOM_VELOCITY_TEXTURE : StringName = "custom_velocity"
+const COLOR_OUTPUT_TEXTURE : StringName = "color_output"
 
 @export_group("Motion Blur Parameters")
 
