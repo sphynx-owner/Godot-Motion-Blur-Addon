@@ -87,7 +87,7 @@ vec4 sample_x_velocity(vec2 x, float t, vec2 vx, float z, float zx, ivec2 render
 	return textureLod(color_sampler, yx, 0.0);
 }
 
-vec4 sample_y_velocity(vec2 x, float t, vec2 vn, vec2 wn, float z, ivec2 render_size, out float y_weight)
+vec4 sample_y_velocity(vec2 x, float t, vec2 vn, vec2 wn, float z, ivec2 render_size, float j, out float y_weight)
 {
 	vec2 yn = x + t * vn / vec2(render_size);
 		
@@ -114,7 +114,7 @@ vec4 sample_y_velocity(vec2 x, float t, vec2 vn, vec2 wn, float z, ivec2 render_
 
 	float projected = abs(dot(wyn, wn));
 
-	y_weight = step(Tn, vyn_length * projected) * overlapn;
+	y_weight = step(Tn, vyn_length * projected) * overlapn * j;
 
 	return textureLod(color_sampler, yn, 0.0);
 }
@@ -204,12 +204,16 @@ void main()
 	if(vn_length < 0.5)
 	{
 		imageStore(output_color, uvi, base_color);
+		
 #ifdef DEBUG
-		imageStore(debug_1_image, uvi, vec4(1, 0, 1, 1));
-		imageStore(debug_2_image, uvi, vec4(vxzw.xy / render_size * 2, 0, 1));
-		imageStore(debug_3_image, uvi, vec4(step(0, vxzw.w), abs(vxzw.w) / 500, 0, 0));
-		imageStore(debug_4_image, uvi, vec4(step(0, vxzw.z), abs(vxzw.z), 0, 0));
+		imageStore(debug_1_image, uvi, base_color);
 #endif
+// #ifdef DEBUG
+// 		imageStore(debug_1_image, uvi, vec4(1, 0, 1, 1));
+// 		imageStore(debug_2_image, uvi, vec4(vxzw.xy / render_size * 2, 0, 1));
+// 		imageStore(debug_3_image, uvi, vec4(step(0, vxzw.w), abs(vxzw.w) / 500, 0, 0));
+// 		imageStore(debug_4_image, uvi, vec4(step(0, vxzw.z), abs(vxzw.z), 0, 0));
+// #endif
 		return;
 	}
 
@@ -233,7 +237,7 @@ void main()
 
 	for(int i = 0; i < params.sample_count; i++)
 	{
-		float ti = (i + j) / params.sample_count;
+		float ti = float(i + j) / params.sample_count;
 
 		// A point in time along the blur interval, used to scale velocity vectors to sample for color.
 		float t = mix(-0.5, 0, ti);
@@ -254,11 +258,11 @@ void main()
 		
 		float y_weight;
 
-		vec4 y_sample = sample_y_velocity(x, t, vn, wn, zx, render_size, y_weight);
+		vec4 y_sample = sample_y_velocity(x, t, vn, wn, zx, render_size, 1.0, y_weight);
 		
 		float neg_y_weight;
 
-		vec4 neg_y_sample = sample_y_velocity(x, -t, vn, wn, zx, render_size, neg_y_weight);
+		vec4 neg_y_sample = sample_y_velocity(x, -t, vn, wn, zx, render_size, 1.0, neg_y_weight);
 
 		blend_blur(base_color, x_sample, x_weight, neg_x_sample, neg_x_weight, y_sample, y_weight, current_total_weight, sum, color_weight, alpha_weight);
 
@@ -272,8 +276,12 @@ void main()
 
 #ifdef DEBUG
 	imageStore(debug_1_image, uvi, base_color);
-	imageStore(debug_2_image, uvi, vec4(vxzw.xy / render_size * 2, 0, 1));
-	imageStore(debug_3_image, uvi, vec4(step(0, vxzw.w), abs(vxzw.w) / 500, 0, 0));
-	imageStore(debug_4_image, uvi, vec4(step(0, vxzw.z), abs(vxzw.z), 0, 0));
 #endif
+
+// #ifdef DEBUG
+// 	imageStore(debug_1_image, uvi, base_color);
+// 	imageStore(debug_2_image, uvi, vec4(vxzw.xy / render_size * 2, 0, 1));
+// 	imageStore(debug_3_image, uvi, vec4(step(0, vxzw.w), abs(vxzw.w) / 500, 0, 0));
+// 	imageStore(debug_4_image, uvi, vec4(step(0, vxzw.z), abs(vxzw.z), 0, 0));
+// #endif
 }

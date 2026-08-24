@@ -233,10 +233,16 @@ void main()
 	imageStore(vector_output, uvi, vec4(total_velocity * (view_past_ndc_cache.w < 0 ? -1 : 1) * vec3(render_size, 1.0), depth == 0 ? (-1.0 / 0.0) : view_position.z));
 
 #ifdef DEBUG
-	vec2 velocity = textureLod(vector_sampler, uvn, 0.0).xy;
-	float velocity_length = length(velocity);
-	velocity = velocity * clamp(velocity_length, 0, 10) / velocity_length;
-	imageStore(debug_6_image, uvi, vec4(velocity * (view_past_ndc_cache.w < 0 ? -1 : 1), view_past_ndc_cache.w < 0 ? 1 : 0, 1));
-	imageStore(debug_7_image, uvi, vec4(camera_uv_change.xy, 0, 1));
+	imageStore(debug_2_image, uvi, vec4(textureLod(depth_sampler, uvn, 0.0).x));
+	imageStore(debug_3_image, uvi, vec4(textureLod(vector_sampler, uvn, 0.0).xy, 0.0, 0.0));
+	imageStore(debug_4_image, uvi, vec4(total_velocity * (view_past_ndc_cache.w < 0 ? -1 : 1) * vec3(render_size, 1.0), 0.0));
 #endif
+
+// #ifdef DEBUG
+// 	vec2 velocity = textureLod(vector_sampler, uvn, 0.0).xy;
+// 	float velocity_length = length(velocity);
+// 	velocity = velocity * clamp(velocity_length, 0, 10) / velocity_length;
+// 	imageStore(debug_6_image, uvi, vec4(velocity * (view_past_ndc_cache.w < 0 ? -1 : 1), view_past_ndc_cache.w < 0 ? 1 : 0, 1));
+// 	imageStore(debug_7_image, uvi, vec4(camera_uv_change.xy, 0, 1));
+// #endif
 }

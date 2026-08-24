@@ -87,8 +87,6 @@ func _init():
 	needs_normal_roughness = false
 	
 	RenderingServer.call_on_render_thread(_custom_curve_updated)
-	
-	super()
 
 
 func _validate_property(property: Dictionary) -> void:

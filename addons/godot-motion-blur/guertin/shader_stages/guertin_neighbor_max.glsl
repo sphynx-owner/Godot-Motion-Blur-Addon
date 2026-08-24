@@ -70,4 +70,14 @@ void main()
 	}
 
 	imageStore(neighbor_max, uvi, vec4(max_neighbor_velocity, 0, 0));
+
+#ifdef DEBUG
+	for(int i = 0; i < 40; i++)
+	{
+		for(int j = 0; j < 40; j++)
+		{
+			imageStore(debug_7_image, uvi * 40 + ivec2(i, j), vec4(max_neighbor_velocity, 0, 0));
+		}
+	}
+#endif
 }

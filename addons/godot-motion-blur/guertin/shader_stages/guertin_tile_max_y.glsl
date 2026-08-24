@@ -52,4 +52,14 @@ void main()
 		}
 	}
 	imageStore(tile_max, uvi, max_velocity);
+
+#ifdef DEBUG
+	for(int i = 0; i < 40; i++)
+	{
+		for(int j = 0; j < 40; j++)
+		{
+			imageStore(debug_6_image, uvi * 40 + ivec2(i, j), max_velocity);
+		}
+	}
+#endif
 }

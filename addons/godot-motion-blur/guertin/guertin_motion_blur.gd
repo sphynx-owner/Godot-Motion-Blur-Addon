@@ -2,24 +2,25 @@
 class_name GuertinMotionBlur
 extends BaseGuertingMotionBlur
 
-const TILE_MAX_X_TEXTURE : StringName = "tile_max_x"
-const TILE_MAX_TEXTURE : StringName = "tile_max"
-const NEIGHBOR_MAX_TEXTURE : StringName = "neighbor_max"
-const TILE_VARIANCE_TEXTURE : StringName = "tile_variance"
+const TILE_MAX_X_TEXTURE : StringName = &"tile_max_x"
 
-@export_storage var blur_stage: RDShaderFile = preload("res://addons/godot-motion-blur/guertin/shader_stages/guertin_sphynx_blur.glsl")
+const TILE_MAX_TEXTURE : StringName = &"tile_max"
 
-@export_storage var overlay_stage: RDShaderFile = preload("res://addons/godot-motion-blur/guertin/shader_stages/guertin_overlay.glsl")
+const NEIGHBOR_MAX_TEXTURE : StringName = &"neighbor_max"
 
-@export_storage var tile_max_x_stage: RDShaderFile = preload("res://addons/godot-motion-blur/guertin/shader_stages/guertin_tile_max_x.glsl")
+const TILE_VARIANCE_TEXTURE : StringName = &"tile_variance"
 
-@export_storage var tile_max_y_stage: RDShaderFile = preload("res://addons/godot-motion-blur/guertin/shader_stages/guertin_tile_max_y.glsl")
+@export var blur_stage: RDShaderFile = preload("res://addons/godot-motion-blur/guertin/shader_stages/guertin_sphynx_blur.glsl")
 
-@export_storage var neighbor_max_stage: RDShaderFile = preload("res://addons/godot-motion-blur/guertin/shader_stages/guertin_neighbor_max.glsl")
+@export var overlay_stage: RDShaderFile = preload("res://addons/godot-motion-blur/guertin/shader_stages/guertin_overlay.glsl")
+
+@export var tile_max_x_stage: RDShaderFile = preload("res://addons/godot-motion-blur/guertin/shader_stages/guertin_tile_max_x.glsl")
+
+@export var tile_max_y_stage: RDShaderFile = preload("res://addons/godot-motion-blur/guertin/shader_stages/guertin_tile_max_y.glsl")
+
+@export var neighbor_max_stage: RDShaderFile = preload("res://addons/godot-motion-blur/guertin/shader_stages/guertin_neighbor_max.glsl")
 
 var _previous_time : float = 0
-
-var _stencil_texture: Texture2DRD
 
 
 func _enhanced_render_callback(render_size : Vector2i):
@@ -103,7 +104,7 @@ func _enhanced_render_callback(render_size : Vector2i):
 		]
 	)
 	
-	rd.draw_command_begin_label("Pre Blur Processing", Color(1.0, 1.0, 1.0, 1.0))
+	rd_instance.rd.draw_command_begin_label("Pre Blur Processing", Color(1.0, 1.0, 1.0, 1.0))
 	
 	var depth_image: RID = get_depth_texture()
 	
@@ -115,17 +116,16 @@ func _enhanced_render_callback(render_size : Vector2i):
 			get_sampler_uniform(depth_image, 0, false),
 			get_sampler_uniform(get_velocity_texture(), 1, false),
 			get_image_uniform(custom_velocity_image, 2),
-			get_buffer_uniform(get_scene_uniform_data_buffer(), 3),
-			#get_sampler_uniform(_stencil_texture.texture_rd_rid, 4)
+			get_buffer_uniform(get_scene_uniform_data_buffer(), 3)
 		],
 		pre_blur_push_constants,
 		get_groups_count(Vector3(render_size.x, render_size.y, 1), DEFAULT_GROUP_SIZE), 
 		"Process Velocity Buffer"
 	)
 	
-	rd.draw_command_end_label()
+	rd_instance.rd.draw_command_end_label()
 	
-	rd.draw_command_begin_label("Motion Blur", Color(1.0, 1.0, 1.0, 1.0))
+	rd_instance.rd.draw_command_begin_label("Motion Blur", Color(1.0, 1.0, 1.0, 1.0))
 	
 	var color_image: RID = get_color_texture()
 	
@@ -199,4 +199,4 @@ func _enhanced_render_callback(render_size : Vector2i):
 		"Overlay result"
 	)
 	
-	rd.draw_command_end_label()
+	rd_instance.rd.draw_command_end_label()
