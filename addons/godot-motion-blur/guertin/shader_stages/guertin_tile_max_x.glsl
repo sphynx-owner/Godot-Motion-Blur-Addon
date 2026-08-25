@@ -67,6 +67,9 @@ void main()
 	imageStore(tile_max_x, uvi, max_velocity);
 
 #ifdef DEBUG
-	imageStore(debug_5_image, uvi, max_velocity);
+	for(int i = 0; i < params.tile_size; i++)
+	{
+		imageStore(debug_5_image, uvi * ivec2(params.tile_size, 1) + ivec2(i, 0), max_velocity);
+	}
 #endif
 }
