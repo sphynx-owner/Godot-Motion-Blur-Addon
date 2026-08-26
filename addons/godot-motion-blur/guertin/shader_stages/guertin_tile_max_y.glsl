@@ -58,7 +58,7 @@ void main()
 	{
 		for(int j = 0; j < 40; j++)
 		{
-			imageStore(debug_6_image, uvi * 40 + ivec2(i, j), max_velocity);
+			imageStore(debug_6_image, uvi * 40 + ivec2(i, j), i == 0 || j == 0 ? vec4(0.0) : max_velocity);
 		}
 	}
 #endif

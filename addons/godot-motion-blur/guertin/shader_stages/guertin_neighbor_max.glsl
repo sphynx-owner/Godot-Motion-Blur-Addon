@@ -76,7 +76,7 @@ void main()
 	{
 		for(int j = 0; j < 40; j++)
 		{
-			imageStore(debug_7_image, uvi * 40 + ivec2(i, j), vec4(max_neighbor_velocity, 0, 0));
+			imageStore(debug_7_image, uvi * 40 + ivec2(i, j), i == 0 || j == 0 ? vec4(0.0) : vec4(max_neighbor_velocity, 0, 0));
 		}
 	}
 #endif

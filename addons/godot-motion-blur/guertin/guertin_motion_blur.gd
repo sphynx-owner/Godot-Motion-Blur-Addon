@@ -40,28 +40,32 @@ func _enhanced_render_callback(render_size : Vector2i):
 		
 		temp_intensity = intensity * capped_frame_time / delta_time
 	
+	var max_x_size: Vector2i = divide_vector2i_by_tile_size(render_size, Vector2i(tile_size, 1))
+	
+	var neighbor_max_size: Vector2i = divide_vector2i_by_tile_size(render_size, Vector2i(tile_size, tile_size))
+	
 	ensure_texture(
 		TILE_MAX_X_TEXTURE,
-		RenderingDevice.DATA_FORMAT_R16G16B16A16_SFLOAT, 
-		Vector2(1. / tile_size, 1.)
+		RenderingDevice.DATA_FORMAT_R16G16B16A16_SFLOAT,
+		max_x_size
 	)
 	
 	ensure_texture(
 		TILE_MAX_TEXTURE,
-		RenderingDevice.DATA_FORMAT_R16G16B16A16_SFLOAT, 
-		Vector2(1. / tile_size, 1. / tile_size)
+		RenderingDevice.DATA_FORMAT_R16G16B16A16_SFLOAT,
+		neighbor_max_size
 	)
 	
 	ensure_texture(
 		NEIGHBOR_MAX_TEXTURE,
-		RenderingDevice.DATA_FORMAT_R16G16B16A16_SFLOAT, 
-		Vector2(1. / tile_size, 1. / tile_size)
+		RenderingDevice.DATA_FORMAT_R16G16B16A16_SFLOAT,
+		neighbor_max_size
 	)
 	
 	ensure_texture(
 		TILE_VARIANCE_TEXTURE,
-		RenderingDevice.DATA_FORMAT_R16G16B16A16_SFLOAT, 
-		Vector2(1. / tile_size, 1. / tile_size)
+		RenderingDevice.DATA_FORMAT_R16G16B16A16_SFLOAT,
+		neighbor_max_size
 	)
 	
 	ensure_texture(CUSTOM_VELOCITY_TEXTURE)
@@ -110,6 +114,8 @@ func _enhanced_render_callback(render_size : Vector2i):
 	
 	var custom_velocity_image: RID = get_texture(CUSTOM_VELOCITY_TEXTURE)
 	
+	var render_groups_count: Vector3i = get_groups_count(Vector3i(render_size.x, render_size.y, 1), DEFAULT_GROUP_SIZE)
+	
 	dispatch_stage(
 		pre_blur_processor_stage, 
 		[
@@ -119,7 +125,7 @@ func _enhanced_render_callback(render_size : Vector2i):
 			get_buffer_uniform(get_scene_uniform_data_buffer(), 3)
 		],
 		pre_blur_push_constants,
-		get_groups_count(Vector3(render_size.x, render_size.y, 1), DEFAULT_GROUP_SIZE), 
+		render_groups_count, 
 		"Process Velocity Buffer"
 	)
 	
@@ -139,6 +145,8 @@ func _enhanced_render_callback(render_size : Vector2i):
 	
 	var tile_variance_image: RID = get_texture(TILE_VARIANCE_TEXTURE)
 	
+	var max_x_groups_count: Vector3i = get_groups_count(Vector3i(max_x_size.x, max_x_size.y, 1), DEFAULT_GROUP_SIZE)
+	
 	dispatch_stage(
 		tile_max_x_stage, 
 		[
@@ -147,8 +155,13 @@ func _enhanced_render_callback(render_size : Vector2i):
 			get_image_uniform(tile_max_x_image, 2)
 		],
 		tile_max_x_push_constants,
-		get_groups_count(Vector3(render_size.x / tile_size, render_size.y, 1), DEFAULT_GROUP_SIZE), 
+		max_x_groups_count, 
 		"TileMaxX"
+	)
+	
+	var neighbor_max_groups_count: Vector3i = get_groups_count(
+		Vector3i(neighbor_max_size.x, neighbor_max_size.y, 1),
+		DEFAULT_GROUP_SIZE
 	)
 	
 	dispatch_stage(
@@ -158,7 +171,7 @@ func _enhanced_render_callback(render_size : Vector2i):
 			get_image_uniform(tile_max_image, 1)
 		],
 		tile_max_y_push_constants,
-		get_groups_count(Vector3(render_size.x / tile_size, render_size.y / tile_size, 1), DEFAULT_GROUP_SIZE), 
+		neighbor_max_groups_count, 
 		"TileMaxY"
 	)
 	
@@ -169,7 +182,7 @@ func _enhanced_render_callback(render_size : Vector2i):
 			get_image_uniform(neighbor_max_image, 1)
 		],
 		neighbor_max_push_constants,
-		get_groups_count(Vector3(render_size.x / tile_size, render_size.y / tile_size, 1), DEFAULT_GROUP_SIZE), 
+		neighbor_max_groups_count, 
 		"NeighborMax"
 	)
 	
@@ -184,7 +197,7 @@ func _enhanced_render_callback(render_size : Vector2i):
 			get_sampler_uniform(custom_curve_texture_rd.texture_rd_rid, 5, true)
 		],
 		blur_push_constants,
-		get_groups_count(Vector3(render_size.x, render_size.y, 1), DEFAULT_GROUP_SIZE), 
+		render_groups_count, 
 		"Blur Reconstruction"
 	)
 	
@@ -195,7 +208,7 @@ func _enhanced_render_callback(render_size : Vector2i):
 			get_image_uniform(color_image, 1)
 		],
 		[],
-		get_groups_count(Vector3(render_size.x, render_size.y, 1), DEFAULT_GROUP_SIZE), 
+		render_groups_count, 
 		"Overlay result"
 	)
 	

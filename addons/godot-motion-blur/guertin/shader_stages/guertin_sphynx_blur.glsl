@@ -114,7 +114,7 @@ vec4 sample_y_velocity(vec2 x, float t, vec2 vn, vec2 wn, float z, ivec2 render_
 
 	float projected = abs(dot(wyn, wn));
 
-	y_weight = step(Tn, vyn_length * projected) * overlapn * j;
+	y_weight = step(Tn, vyn_length / 2.0 * projected) * overlapn * j;
 
 	return textureLod(color_sampler, yn, 0.0);
 }
@@ -201,7 +201,7 @@ void main()
 	// We must account for cases where the dominant velocity is 0 even though 
 	// The current velocity is not. This is only the case for the skybox, which
 	// Will never overlap geometry so it can safely be ignored when calculating neighbor_max
-	if(vn_length < 0.5)
+	if(vn_length < 0.5 && vx_length < 0.5)
 	{
 		imageStore(output_color, uvi, base_color);
 		
