@@ -43,6 +43,7 @@ float soft_compare(float a, float b, float sze)
 // from https://www.shadertoy.com/view/ftKfzc
 // ----------------------------------------------------------
 float interleaved_gradient_noise(vec2 uv){
+	//return 0.5;
 	uv += float(params.frame) * (vec2(47, 17) * 0.695);
 
     vec3 magic = vec3( 0.06711056, 0.00583715, 52.9829189 );
@@ -62,10 +63,10 @@ vec2 safenorm(vec2 v)
 vec2 jitter_tile(vec2 uvi)
 {
 	float rx, ry;
-	float angle = interleaved_gradient_noise(uvi + vec2(2, 0)) * M_PI * 2;
+	float angle = interleaved_gradient_noise(uvi) * M_PI * 2;
 	rx = cos(angle);
 	ry = sin(angle);
-	return vec2(rx, ry) / textureSize(neighbor_max, 0) / 4;
+	return vec2(rx, ry) * params.tile_size / 8;
 }
 // ----------------------------------------------------------
 
@@ -172,7 +173,9 @@ void main()
 
 	// We get the neighbor-max velocity for the tile we are in, with some jitter
 	// between tiles to hide seams between them.
-	vec4 vnzw = sample_velocity(neighbor_max, x + (params.jitter_tiles == 1 ? jitter_tile(uvi) : vec2(0)));
+	// HACK @sphynx-owner: multiplying the input uvi to jitter_tile by 2 seems to help reducing large emergent
+	// patchiness in the blurred results. 
+	vec4 vnzw = texelFetch(neighbor_max, (uvi + ivec2(params.jitter_tiles == 1 ? jitter_tile(uvi * 1) : vec2(0))) / params.tile_size, 0) * vec4(vec2(params.motion_blur_intensity), 1, 1);
 
 	vec2 vn = vnzw.xy;
 
@@ -275,6 +278,7 @@ void main()
 	imageStore(output_color, uvi, sum);
 
 #ifdef DEBUG
+	imageStore(debug_8_image, uvi, vec4(vnzw.xy / render_size, uvi.x % params.tile_size == 0 || uvi.y %params.tile_size == 0  ? 1.0 : 0.0, 0.0));
 	imageStore(debug_1_image, uvi, base_color);
 #endif
 

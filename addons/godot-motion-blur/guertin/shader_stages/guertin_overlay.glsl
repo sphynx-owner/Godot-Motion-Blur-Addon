@@ -18,6 +18,6 @@ void main()
 	imageStore(color_image, uv, textureLod(blur_sampler, (vec2(uv) + 0.5) / output_size, 0.0));
 
 #ifdef DEBUG
-	imageStore(debug_8_image, uv, textureLod(blur_sampler, (vec2(uv) + 0.5) / output_size, 0.0));
+	//imageStore(debug_8_image, uv, textureLod(blur_sampler, (vec2(uv) + 0.5) / output_size, 0.0));
 #endif
 }
