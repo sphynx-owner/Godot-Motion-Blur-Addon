@@ -106,6 +106,10 @@ vec4 sample_y_velocity(vec2 x, float t, vec2 vn, vec2 wn, float z, ivec2 render_
 
 	float vyn_length = max(0.5, length(vyn));
 
+	// TODO @sphynx-owner This could be perhaps moved over to the sample_velocity function... not sure.
+	// The clamping could be done on the neighbor-max stage. Or should it be done on the pre-blur stage?
+	// having it on the pre-blur stage would help prevent saturation of velocity dilation. I also need
+	// to figure out exactly to what length to clamp velocities.
 	if(params.clamp_velocities_to_tile == 1)
 	{
 		float clamp_ratio = max(vyn_length / params.tile_size, 1.0);
@@ -115,7 +119,8 @@ vec4 sample_y_velocity(vec2 x, float t, vec2 vn, vec2 wn, float z, ivec2 render_
 
 	float projected = abs(dot(wyn, wn));
 
-	y_weight = step(Tn, vyn_length / 2.0 * projected) * overlapn * j;
+
+	y_weight = step(Tn, vyn_length / 2.0 * projected) * overlapn * j * pow(length(vn) / length(vyn), 0.5);
 
 	return textureLod(color_sampler, yn, 0.0);
 }
@@ -136,6 +141,9 @@ void blend_blur(
 {
 	float current_weight_x = max(x_weight, neg_x_weight);
 
+	// TODO @sphynx-owner: figure out a better heuristic to choosing a value. If the weight cannot be larger than
+	// 1, we can simply get the difference between the negative weight and the regular weigth, clamping it between 0 and 1.
+	// this needs to be thoroughly tested.
 	vec4 x_color_sample = mix(neg_x_sample, x_sample, clamp(x_weight / neg_x_weight, 0, 1));
 
 	vec4 current_color = mix(mix(base_color, x_color_sample, current_weight_x), y_sample, y_weight);
@@ -174,8 +182,11 @@ void main()
 	// We get the neighbor-max velocity for the tile we are in, with some jitter
 	// between tiles to hide seams between them.
 	// HACK @sphynx-owner: multiplying the input uvi to jitter_tile by 2 seems to help reducing large emergent
-	// patchiness in the blurred results. 
-	vec4 vnzw = texelFetch(neighbor_max, (uvi + ivec2(params.jitter_tiles == 1 ? jitter_tile(uvi * 1) : vec2(0))) / params.tile_size, 0) * vec4(vec2(params.motion_blur_intensity), 1, 1);
+	// patchiness in the blurred results.
+	// TODO @sphynx-owner: figure out the most optimized way to generate the different textures and sample them.
+	// Technically working in screen space is the more correct way to operate because it would reduce the infulence
+	// of the screen's aspect ratio, so we cannot get rid of the render size modifiers, maybe commit to them more?
+	vec4 vnzw = texelFetch(neighbor_max, (uvi + ivec2(params.jitter_tiles == 1 ? jitter_tile(uvi * 2) : vec2(0))) / params.tile_size, 0) * vec4(vec2(params.motion_blur_intensity), 1, 1);
 
 	vec2 vn = vnzw.xy;
 
@@ -209,6 +220,7 @@ void main()
 		imageStore(output_color, uvi, base_color);
 		
 #ifdef DEBUG
+		imageStore(debug_8_image, uvi, vec4(vnzw.xy / render_size, uvi.x % params.tile_size == 0 || uvi.y %params.tile_size == 0  ? 1.0 : 0.0, 0.0));
 		imageStore(debug_1_image, uvi, base_color);
 #endif
 // #ifdef DEBUG
@@ -265,7 +277,7 @@ void main()
 		
 		float neg_y_weight;
 
-		vec4 neg_y_sample = sample_y_velocity(x, -t, vn, wn, zx, render_size, 1.0, neg_y_weight);
+		vec4 neg_y_sample = sample_y_velocity(x, neg_t, vn, wn, zx, render_size, 1.0, neg_y_weight);
 
 		blend_blur(base_color, x_sample, x_weight, neg_x_sample, neg_x_weight, y_sample, y_weight, current_total_weight, sum, color_weight, alpha_weight);
 
