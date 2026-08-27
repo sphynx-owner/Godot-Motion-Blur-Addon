@@ -26,31 +26,38 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 void main() 
 {
 	ivec2 render_size = ivec2(textureSize(tile_max_x, 0));
+
 	ivec2 output_size = imageSize(tile_max);
+
 	ivec2 uvi = ivec2(gl_GlobalInvocationID.xy);
+
 	ivec2 global_uvi = uvi * ivec2(1, params.tile_size);
+
 	if ((uvi.x >= output_size.x) || (uvi.y >= output_size.y) || (global_uvi.x >= render_size.x) || (global_uvi.y >= render_size.y)) 
 	{
 		return;
 	}
-
-	vec2 uvn = (vec2(global_uvi) + vec2(0.5)) / render_size;
-
+	
 	vec4 max_velocity = vec4(0);
 
-	float max_velocity_length = -1;
+	float max_velocity_length_squared = -1;
 
 	for(int i = 0; i < params.tile_size; i++)
 	{
-		vec2 current_uv = uvn + vec2(0, float(i) / render_size.y);
-		vec2 velocity_sample = textureLod(tile_max_x, current_uv, 0.0).xy;
-		float current_velocity_length = dot(velocity_sample, velocity_sample);
-		if(current_velocity_length > max_velocity_length)
+		ivec2 current_uvi = global_uvi + ivec2(0, i);
+
+		vec2 velocity_sample = texelFetch(tile_max_x, current_uvi, 0).xy;
+
+		float current_velocity_length_squared = dot(velocity_sample, velocity_sample);
+
+		if(current_velocity_length_squared > max_velocity_length_squared)
 		{
-			max_velocity_length = current_velocity_length;
+			max_velocity_length_squared = current_velocity_length_squared;
+
 			max_velocity = vec4(velocity_sample, 0, 0);
 		}
 	}
+
 	imageStore(tile_max, uvi, max_velocity);
 
 #ifdef DEBUG

@@ -26,32 +26,34 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 void main() 
 {
 	ivec2 render_size = ivec2(textureSize(tile_max, 0));
+
 	ivec2 uvi = ivec2(gl_GlobalInvocationID.xy);
+
 	if ((uvi.x >= render_size.x) || (uvi.y >= render_size.y)) 
 	{
 		return;
 	}
 
-	vec2 uvn = (vec2(uvi) + vec2(0.5)) / render_size;
-
 	vec2 max_neighbor_velocity = vec2(0);
 
-	float max_neighbor_velocity_length = 0;
+	float max_neighbor_velocity_length_squared = 0;
 
-	for(int i = -1; i < 2; i++)
+	for(int i = -1; i <= 1; i++)
 	{
-		for(int j = -1; j < 2; j++)
+		for(int j = -1; j <= 1; j++)
 		{
-			vec2 current_offset = vec2(1) / vec2(render_size) * vec2(i, j);
-			vec2 current_uv = uvn + current_offset;
-			if(current_uv.x < 0 || current_uv.x > 1 || current_uv.y < 0 || current_uv.y > 1)
+			ivec2 current_offset = ivec2(i, j);
+
+			ivec2 current_uvi = uvi + current_offset;
+
+			if(current_uvi.x < 0 || current_uvi.x >= render_size.x || current_uvi.y < 0 || current_uvi.y >= render_size.y)
 			{
 				continue;
 			}
 
-			bool is_diagonal = (abs(i) + abs(j) == 2);
+			bool is_diagonal = i != 0 && j != 0;
 
-			vec2 current_neighbor_velocity = textureLod(tile_max, current_uv, 0.0).xy;
+			vec2 current_neighbor_velocity = texelFetch(tile_max, current_uvi, 0).xy;
 
 			bool facing_center = dot(current_neighbor_velocity, current_offset) > 0;
 
@@ -60,10 +62,12 @@ void main()
 				continue;
 			}
 
-			float current_neighbor_velocity_length = dot(current_neighbor_velocity, current_neighbor_velocity);
-			if(current_neighbor_velocity_length > max_neighbor_velocity_length)
+			float current_neighbor_velocity_length_squared = dot(current_neighbor_velocity, current_neighbor_velocity);
+
+			if(current_neighbor_velocity_length_squared > max_neighbor_velocity_length_squared)
 			{
-				max_neighbor_velocity_length = current_neighbor_velocity_length;
+				max_neighbor_velocity_length_squared = current_neighbor_velocity_length_squared;
+
 				max_neighbor_velocity = current_neighbor_velocity;
 			}
 		}

@@ -27,37 +27,41 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 void main() 
 {
 	ivec2 render_size = ivec2(textureSize(velocity_sampler, 0));
+
 	ivec2 output_size = imageSize(tile_max_x);
+	
 	ivec2 uvi = ivec2(gl_GlobalInvocationID.xy);
+
 	ivec2 global_uvi = uvi * ivec2(params.tile_size, 1);
+
 	if ((uvi.x >= output_size.x) || (uvi.y >= output_size.y) || (global_uvi.x >= render_size.x) || (global_uvi.y >= render_size.y))  
 	{
 		return;
 	}
 
-	vec2 uvn = (vec2(global_uvi) + vec2(0.5)) / render_size;
-
 	vec4 max_velocity = vec4(0);
 
-	float max_velocity_length = -1;
+	float max_velocity_length_squared = -1;
 
 	for(int i = 0; i < params.tile_size; i++)
 	{
-		vec2 current_uv = uvn + vec2(float(i) / render_size.x, 0);
-		vec4 velocity_sample = textureLod(velocity_sampler, current_uv, 0.0);
+		ivec2 current_uvi = global_uvi + ivec2(i, 0);
+
+		vec4 velocity_sample = texelFetch(velocity_sampler, current_uvi, 0);
 		
 		// If the depth at the potential dominant velocity is infinity (background or skybox)
 		// then it will never go in front of other geometry, and can be skipped.
-		// TODO @sphynx-owner: enable when considering ignoring skybox for dominant velocity
 		if(velocity_sample.w == (-1.0 / 0.0))
 		{
 			continue;
 		}
 
-		float current_velocity_length = dot(velocity_sample.xy, velocity_sample.xy);
-		if(current_velocity_length > max_velocity_length)
+		float current_velocity_length_squared = dot(velocity_sample.xy, velocity_sample.xy);
+
+		if(current_velocity_length_squared > max_velocity_length_squared)
 		{
-			max_velocity_length = current_velocity_length;
+			max_velocity_length_squared = current_velocity_length_squared;
+
 			max_velocity = vec4(velocity_sample.xy, 0, 0);
 		}
 	}
