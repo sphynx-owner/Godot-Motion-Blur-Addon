@@ -4,8 +4,8 @@
 #define FLT_MAX 3.402823466e+38
 #define FLT_MIN 1.175494351e-38
 
-layout(set = 0, binding = 0) uniform sampler2D tile_max;
-layout(rgba16f, set = 0, binding = 1) uniform writeonly image2D neighbor_max;
+layout(set = 0, binding = 0) uniform isampler2D tile_max;
+layout(rg8i, set = 0, binding = 1) uniform writeonly iimage2D neighbor_max;
 // DEBUG_UNIFORMS
 
 layout(push_constant, std430) uniform Params 
@@ -73,7 +73,7 @@ void main()
 		}
 	}
 
-	imageStore(neighbor_max, uvi, vec4(max_neighbor_velocity, 0, 0));
+	imageStore(neighbor_max, uvi, ivec4(max_neighbor_velocity, 0, 0));
 
 #ifdef DEBUG
 	for(int i = 0; i < 40; i++)

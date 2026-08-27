@@ -5,8 +5,7 @@
 #define FLT_MIN 1.175494351e-38
 
 layout(set = 0, binding = 0) uniform sampler2D velocity_sampler;
-layout(set = 0, binding = 1) uniform sampler2D depth_sampler;
-layout(rgba16f, set = 0, binding = 2) uniform writeonly image2D tile_max_x;
+layout(rg8i, set = 0, binding = 1) uniform writeonly iimage2D tile_max_x;
 // DEBUG_UNIFORMS
 
 layout(push_constant, std430) uniform Params 
@@ -39,7 +38,7 @@ void main()
 		return;
 	}
 
-	vec4 max_velocity = vec4(0);
+	ivec4 max_velocity = ivec4(0);
 
 	float max_velocity_length_squared = -1;
 
@@ -62,7 +61,7 @@ void main()
 		{
 			max_velocity_length_squared = current_velocity_length_squared;
 
-			max_velocity = vec4(velocity_sample.xy, 0, 0);
+			max_velocity = ivec4(velocity_sample.xy, 0, 0);
 		}
 	}
 

@@ -8,29 +8,25 @@
 #define PIXEL_RADIUS 0.5
 #define PIXEL_RADIUS_SQUARED 0.25
 
+// NOTE @sphynx-owner: the velocity texture sampler must have the filtering set to nearest.
+#define sample_velocity(velocity_texture, uv) textureLod(velocity_texture, uv, 0.0)
+
 layout(set = 0, binding = 0) uniform sampler2D color_sampler;
 layout(set = 0, binding = 1) uniform sampler2D velocity_sampler;
-layout(set = 0, binding = 2) uniform sampler2D neighbor_max;
-layout(set = 0, binding = 3) uniform sampler2D tile_variance;
-layout(rgba16f, set = 0, binding = 4) uniform writeonly image2D output_color;
-layout(set = 0, binding = 5) uniform sampler2D custom_curve;
+layout(set = 0, binding = 2) uniform isampler2D neighbor_max;
+layout(rgba16f, set = 0, binding = 3) uniform writeonly image2D output_color;
 // DEBUG_UNIFORMS
-
 
 layout(push_constant, std430) uniform Params 
 {	
-	float motion_blur_intensity;
-	float nan0;
-	float nan1;
-	float nan2;
 	int tile_size;
 	int sample_count;
 	int frame;
-	int use_custom_curve;
 	int jitter_tiles;
 	int velocity_depth_test;
 	int transparent_bg;
-	int nan;
+	int nan1;
+	int nan2;
 } params;
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
@@ -64,17 +60,13 @@ vec2 safenorm(vec2 v) {
 vec2 jitter_tile(vec2 uvi) {
 	float rx, ry;
 	// HACK @sphynx-owner: multiplying the input uvi seems to help reducing large emergent
-	// patchiness in the blurred results.
+	// patchiness in the blurred results along the jittered seams between tiles.
 	float angle = interleaved_gradient_noise(uvi * 4) * M_PI * 2;
 	rx = cos(angle);
 	ry = sin(angle);
 	return vec2(rx, ry) * params.tile_size / 4;
 }
 // ----------------------------------------------------------
-
-vec4 sample_velocity(sampler2D velocity_texture, vec2 uv) {
-	return textureLod(velocity_texture, uv, 0.0) * vec4(vec2(params.motion_blur_intensity), 1, 1);
-}
 
 vec4 sample_x_velocity(vec2 x, float t, vec2 vx, float z, float zx, ivec2 render_size, out float x_weight) {
 	vec2 yx = x + t * vx / vec2(render_size);
@@ -133,7 +125,7 @@ vec4 sample_y_velocity(vec2 x, float t, vec2 vn, float vn_length, vec2 wn, float
 
 	// y_weight is determined by:
 	// 1. Can the found velocity reach over to this pixel
-	// 2. Is the depth at the found pixel including its depth velocity overlapping the current one
+	// 2. Is the depth at the found pixel, including its depth velocity, overlap the current one
 	// 3. An additional offset that handles when the neighbor_max velocity is larger than the found velocity
 	// to counteract the resulting opacity dilution.
 	y_weight = step(Tn, vyn_length / 2.0 * projected) * overlapn * pow(vn_length / length(vyn), 0.5);
@@ -199,13 +191,7 @@ void main() {
 	// TODO @sphynx-owner: figure out the most optimized way to generate the different textures and sample them.
 	// Technically working in screen space is the more correct way to operate because it would reduce the infulence
 	// of the screen's aspect ratio, so we cannot get rid of the render size modifiers, maybe commit to them more?
-	vec4 vnzw = texelFetch(
-		neighbor_max,
-		neighbor_max_uvi,
-		0
-	) * vec4(vec2(params.motion_blur_intensity), 1, 1);
-
-	vec2 vn = vnzw.xy;
+	vec2 vn = texelFetch(neighbor_max, neighbor_max_uvi, 0).xy;
 
 	// We get the true velocity at the current pixel
 	vec4 vxzw = sample_velocity(velocity_sampler, x);
@@ -223,7 +209,7 @@ void main() {
 		imageStore(output_color, uvi, base_color);
 		
 #ifdef DEBUG
-		imageStore(debug_8_image, uvi, vec4(vnzw.xy / render_size, uvi.x % params.tile_size == 0 || uvi.y %params.tile_size == 0  ? 1.0 : 0.0, 0.0));
+		imageStore(debug_8_image, uvi, vec4(vn / render_size, uvi.x % params.tile_size == 0 || uvi.y %params.tile_size == 0 ? 1.0 : 0.0, 0.0));
 		imageStore(debug_1_image, uvi, base_color);
 #endif
 
@@ -290,14 +276,7 @@ void main() {
 	imageStore(output_color, uvi, sum);
 
 #ifdef DEBUG
-	imageStore(debug_8_image, uvi, vec4(vnzw.xy / render_size, uvi.x % params.tile_size == 0 || uvi.y %params.tile_size == 0  ? 1.0 : 0.0, 0.0));
+	imageStore(debug_8_image, uvi, vec4(vn / render_size, uvi.x % params.tile_size == 0 || uvi.y %params.tile_size == 0  ? 1.0 : 0.0, 0.0));
 	imageStore(debug_1_image, uvi, base_color);
 #endif
-
-// #ifdef DEBUG
-// 	imageStore(debug_1_image, uvi, base_color);
-// 	imageStore(debug_2_image, uvi, vec4(vxzw.xy / render_size * 2, 0, 1));
-// 	imageStore(debug_3_image, uvi, vec4(step(0, vxzw.w), abs(vxzw.w) / 500, 0, 0));
-// 	imageStore(debug_4_image, uvi, vec4(step(0, vxzw.z), abs(vxzw.z), 0, 0));
-// #endif
 }

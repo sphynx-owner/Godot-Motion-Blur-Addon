@@ -4,8 +4,8 @@
 #define FLT_MAX 3.402823466e+38
 #define FLT_MIN 1.175494351e-38
 
-layout(set = 0, binding = 0) uniform sampler2D tile_max_x;
-layout(rgba16f, set = 0, binding = 1) uniform writeonly image2D tile_max;
+layout(set = 0, binding = 0) uniform isampler2D tile_max_x;
+layout(rg8i, set = 0, binding = 1) uniform writeonly iimage2D tile_max;
 // DEBUG_UNIFORMS
 
 layout(push_constant, std430) uniform Params 
@@ -38,7 +38,7 @@ void main()
 		return;
 	}
 	
-	vec4 max_velocity = vec4(0);
+	ivec4 max_velocity = ivec4(0);
 
 	float max_velocity_length_squared = -1;
 
@@ -54,7 +54,7 @@ void main()
 		{
 			max_velocity_length_squared = current_velocity_length_squared;
 
-			max_velocity = vec4(velocity_sample, 0, 0);
+			max_velocity = ivec4(velocity_sample, 0, 0);
 		}
 	}
 
@@ -66,6 +66,7 @@ void main()
 		for(int j = 0; j < 40; j++)
 		{
 			imageStore(debug_6_image, uvi * 40 + ivec2(i, j), vec4(max_velocity.xy, i == 0 || j == 0 ? 1.0 : 0.0, 0.0));
+			imageStore(debug_11_image, uvi * 40 + ivec2(i, j), vec4(texelFetch(tile_max_x, uvi * 40 + ivec2(i, j), 0).xy, i == 0 || j == 0 ? 1.0 : 0.0, 0.0));
 		}
 	}
 #endif
