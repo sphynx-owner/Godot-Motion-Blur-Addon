@@ -83,7 +83,8 @@ func _enhanced_render_callback(render_size : Vector2i):
 		camera_movement_upper_threshold,
 		object_movement_upper_threshold,
 		support_fsr2,
-		temp_intensity
+		temp_intensity,
+		tile_size
 	])
 	
 	var tile_max_x_push_constants: PackedByteArray = get_push_constants([], [tile_size], true)
@@ -102,7 +103,6 @@ func _enhanced_render_callback(render_size : Vector2i):
 			Engine.get_frames_drawn() % 8,
 			1 if use_custom_curve else 0,
 			1 if jitter_tiles else 0,
-			1 if clamp_velocities_to_tile else 0,
 			1 if velocity_depth_test else 0,
 			1 if transparent_bg else 0,
 		]
