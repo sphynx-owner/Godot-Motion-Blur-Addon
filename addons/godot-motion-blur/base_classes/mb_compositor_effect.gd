@@ -44,7 +44,7 @@ const COLOR_OUTPUT_TEXTURE : StringName = "color_output"
 ## start to finish.
 @export var custom_curve: Curve
 
-@export var use_custom_curve: bool
+#@export var use_custom_curve: bool
 
 @export var transparent_bg: bool = false
 

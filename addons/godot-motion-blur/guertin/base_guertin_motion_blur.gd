@@ -4,11 +4,7 @@ class_name BaseGuertingMotionBlur
 extends MotionBlurCompositorEffect
 
 @export_group("Guerting Parameters")
-@export var tile_size : int = 40
-
-@export var jitter_tiles: bool = true
-
-@export var clamp_velocities_to_tile: bool = false
+@export_range(0, 64, 1) var tile_size : int = 40
 
 
 func _property_can_revert(property: StringName) -> bool:

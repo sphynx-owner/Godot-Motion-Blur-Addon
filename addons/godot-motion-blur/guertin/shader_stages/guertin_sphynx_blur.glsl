@@ -36,11 +36,11 @@ layout(push_constant, std430) uniform Params
 	int tile_size;
 	int sample_count;
 	int frame;
-	int jitter_tiles;
 	int velocity_depth_test;
 	int transparent_bg;
 	int nan1;
 	int nan2;
+	int nan3;
 } params;
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;

@@ -1,5 +1,5 @@
 @tool
-class_name GuertinMotionBlur
+class_name GuertinSphynxMotionBlur
 extends BaseGuertingMotionBlur
 
 const TILE_MAX_TEXTURE : StringName = &"tile_max"
@@ -83,7 +83,6 @@ func _enhanced_render_callback(render_size : Vector2i):
 			tile_size,
 			samples,
 			Engine.get_frames_drawn() % 64,
-			1 if jitter_tiles else 0,
 			1 if velocity_depth_test else 0,
 			1 if transparent_bg else 0,
 		]
