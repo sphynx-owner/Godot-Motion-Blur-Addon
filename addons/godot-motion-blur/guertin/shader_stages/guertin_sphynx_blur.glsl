@@ -11,6 +11,20 @@
 // NOTE @sphynx-owner: the velocity texture sampler must have the filtering set to nearest.
 #define sample_velocity(velocity_texture, uv) textureLod(velocity_texture, uv, 0.0)
 
+#define USE_JITTER
+
+#ifdef USE_JITTER
+#define TILE_JITTER jitter_tile(uvi)
+
+#define SAMPLE_JITTER j
+
+#else
+#define TILE_JITTER 0
+
+#define SAMPLE_JITTER 0
+#endif
+
+
 layout(set = 0, binding = 0) uniform sampler2D color_sampler;
 layout(set = 0, binding = 1) uniform sampler2D velocity_sampler;
 layout(set = 0, binding = 2) uniform isampler2D neighbor_max;
@@ -57,14 +71,14 @@ vec2 safenorm(vec2 v) {
 	return v / l * int(l >= 0.5);
 }
 
-vec2 jitter_tile(vec2 uvi) {
+ivec2 jitter_tile(ivec2 uvi) {
 	float rx, ry;
 	// HACK @sphynx-owner: multiplying the input uvi seems to help reducing large emergent
 	// patchiness in the blurred results along the jittered seams between tiles.
 	float angle = interleaved_gradient_noise(uvi * 4) * M_PI * 2;
 	rx = cos(angle);
 	ry = sin(angle);
-	return vec2(rx, ry) * params.tile_size / 4;
+	return ivec2(vec2(rx, ry) * params.tile_size / 4);
 }
 // ----------------------------------------------------------
 
@@ -141,7 +155,6 @@ void blend_blur(
 	float neg_x_weight,
 	vec4 y_sample,
 	float y_weight,
-	float weight_modifier,
 	inout vec4 color_sum,
 	inout float color_weight,
 	inout float alpha_weight
@@ -155,15 +168,13 @@ void blend_blur(
 
 	vec4 current_color = mix(mix(base_color, x_color_sample, current_weight_x), y_sample, y_weight);
 
-	float current_color_weight = weight_modifier * max(current_color.a, 1 - params.transparent_bg);
+	float current_color_weight = max(current_color.a, 1 - params.transparent_bg);
 
-	float current_alpha_weight = weight_modifier;
-
-	color_sum += vec4(current_color.xyz * current_color_weight, current_color.a * current_alpha_weight);
+	color_sum += vec4(current_color.xyz * current_color_weight, current_color.a);
 
 	color_weight += current_color_weight;
 
-	alpha_weight += current_alpha_weight;
+	alpha_weight += 1;
 }
 
 void main() {
@@ -184,7 +195,7 @@ void main() {
 	// and avoid artifacts caused by bilinear interpolation.
 	vec2 x = (vec2(uvi) + vec2(0.5)) / vec2(render_size);
 
-	ivec2 neighbor_max_uvi = (uvi + ivec2(params.jitter_tiles == 1 ? jitter_tile(uvi) : vec2(0))) / params.tile_size;
+	ivec2 neighbor_max_uvi = (uvi + TILE_JITTER) / params.tile_size;
 
 	// We get the neighbor-max velocity for the tile we are in, with some jitter
 	// between tiles to hide seams between them.
@@ -240,14 +251,13 @@ void main() {
 
 	for(int i = 0; i < params.sample_count; i++)
 	{
-		float ti = float(i + j) / params.sample_count;
+		float ti = float(i + SAMPLE_JITTER) / params.sample_count;
+		float neg_ti = float(i + 1 - SAMPLE_JITTER) / params.sample_count;
 
 		// A point in time along the blur interval, used to scale velocity vectors to sample for color.
-		float t = mix(-0.5, 0, ti);
+		float t = mix(0, -0.5, ti);
 		
-		float neg_t = -t;
-		
-		float current_total_weight = 1;
+		float neg_t = mix(0, 0.5, neg_ti);
 
 		float x_weight;
 		
@@ -265,9 +275,9 @@ void main() {
 
 		vec4 neg_y_sample = sample_y_velocity(x, neg_t, vn, vn_length, wn, zx, render_size, neg_y_weight);
 
-		blend_blur(base_color, x_sample, x_weight, neg_x_sample, neg_x_weight, y_sample, y_weight, current_total_weight, sum, color_weight, alpha_weight);
+		blend_blur(base_color, x_sample, x_weight, neg_x_sample, neg_x_weight, y_sample, y_weight, sum, color_weight, alpha_weight);
 
-		blend_blur(base_color, neg_x_sample, neg_x_weight, x_sample, x_weight, neg_y_sample, neg_y_weight, current_total_weight, sum, color_weight, alpha_weight);
+		blend_blur(base_color, neg_x_sample, neg_x_weight, x_sample, x_weight, neg_y_sample, neg_y_weight, sum, color_weight, alpha_weight);
 	}
 
 	sum.xyz /= color_weight;

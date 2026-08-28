@@ -2,8 +2,6 @@
 class_name GuertinMotionBlur
 extends BaseGuertingMotionBlur
 
-const TILE_MAX_X_TEXTURE : StringName = &"tile_max_x"
-
 const TILE_MAX_TEXTURE : StringName = &"tile_max"
 
 const NEIGHBOR_MAX_TEXTURE : StringName = &"neighbor_max"
@@ -43,21 +41,19 @@ func _enhanced_render_callback(render_size : Vector2i):
 	var neighbor_max_size: Vector2i = divide_vector2i_by_tile_size(render_size, Vector2i(tile_size, tile_size))
 	
 	ensure_texture(
-		TILE_MAX_X_TEXTURE,
-		RenderingDevice.DATA_FORMAT_R8G8_SINT,
-		max_x_size
-	)
-	
-	ensure_texture(
 		TILE_MAX_TEXTURE,
 		RenderingDevice.DATA_FORMAT_R8G8_SINT,
 		neighbor_max_size
 	)
 	
+	# HACK @sphynx-owner: To save on a texture, NEIGHBOR_MAX_TEXTURE is used both as the texture for the intermediary
+	# tile_max_x stage, and as the output NEIGHBOR_MAX_TEXTURE. This means it has to be as large as the largest
+	# of the two, which is tile_max_x. Conveniently, the glsl code does not have to change at all to accommodate
+	# this, since in the blur processing stage we are sampling it using texelFetch.
 	ensure_texture(
 		NEIGHBOR_MAX_TEXTURE,
 		RenderingDevice.DATA_FORMAT_R8G8_SINT,
-		neighbor_max_size
+		max_x_size
 	)
 	
 	ensure_texture(CUSTOM_VELOCITY_TEXTURE)
@@ -122,8 +118,6 @@ func _enhanced_render_callback(render_size : Vector2i):
 	
 	var color_output_image: RID = get_texture(COLOR_OUTPUT_TEXTURE)
 	
-	var tile_max_x_image: RID = get_texture(TILE_MAX_X_TEXTURE)
-	
 	var tile_max_image: RID = get_texture(TILE_MAX_TEXTURE)
 	
 	var neighbor_max_image: RID = get_texture(NEIGHBOR_MAX_TEXTURE)
@@ -134,7 +128,7 @@ func _enhanced_render_callback(render_size : Vector2i):
 		tile_max_x_stage, 
 		[
 			get_sampler_uniform(custom_velocity_image, 0, false),
-			get_image_uniform(tile_max_x_image, 1)
+			get_image_uniform(neighbor_max_image, 1)
 		],
 		tile_max_x_push_constants,
 		max_x_groups_count, 
@@ -149,7 +143,7 @@ func _enhanced_render_callback(render_size : Vector2i):
 	dispatch_stage(
 		tile_max_y_stage, 
 		[
-			get_sampler_uniform(tile_max_x_image, 0, false),
+			get_sampler_uniform(neighbor_max_image, 0, false),
 			get_image_uniform(tile_max_image, 1)
 		],
 		tile_max_y_push_constants,
