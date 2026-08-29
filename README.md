@@ -78,4 +78,8 @@ This is the pipeline of the effect:
 
 ![alt text](<readme_assets/motion blur pipeline.drawio.png>)
 
-It uses the existing depth, 
+It uses the existing depth, velocity and color textures provided by godot. In addition it uses a texture to store custom processed velocities and depth, 2 textures to generate neighbor_max information and an output color texture.
+
+There are 5 compute stages in the pipeline:
+
+1. Pre Processing - This stage 
