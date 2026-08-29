@@ -72,7 +72,7 @@ void main()
 #ifdef DEBUG
 	for(int i = 0; i < params.tile_size; i++)
 	{
-		imageStore(debug_5_image, uvi * ivec2(params.tile_size, 1) + ivec2(i, 0), vec4(max_velocity.xy, i == 0 ? 1.0 : 0.0, 0.0));
+		imageStore(debug_5_image, uvi * ivec2(params.tile_size, 1) + ivec2(i, 0), vec4(max_velocity.xy / float(params.tile_size * 2), i == 0 ? 1.0 : 0.0, 0.0));
 	}
 #endif
 }

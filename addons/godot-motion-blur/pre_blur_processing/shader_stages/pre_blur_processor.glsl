@@ -296,7 +296,7 @@ void main() {
 	imageStore(vector_output, uvi, final_output);
 
 #ifdef DEBUG
-	imageStore(debug_2_image, uvi, vec4(textureLod(depth_sampler, uvn, 0.0).x));
+	imageStore(debug_2_image, uvi, vec4(pow(textureLod(depth_sampler, uvn, 0.0).x, 0.5)));
 	imageStore(debug_3_image, uvi, vec4(textureLod(vector_sampler, uvn, 0.0).xy, 0.0, 0.0));
 	imageStore(debug_4_image, uvi, vec4(final_output.xy / render_size, abs(final_output.z) / 20.0, 1.0));
 	imageStore(debug_9_image, uvi, vec4(-(final_output.w) / 100.0));
