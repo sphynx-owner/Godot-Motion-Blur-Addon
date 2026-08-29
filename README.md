@@ -76,6 +76,6 @@ I am solving some of these issues in this addon.
 
 This is the pipeline of the effect:
 
-[![Alt Text](<readme_assets/motion blur pipeline.drawio.png>)](<readme_assets/motion blur pipeline.drawio.png>)
+![alt text](<readme_assets/motion blur pipeline.drawio.png>)
 
 It uses the existing depth, 
