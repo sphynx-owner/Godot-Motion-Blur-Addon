@@ -90,7 +90,7 @@ I am solving some of these issues in this addon.
 
 ### The Pipeline
 
-This is the pipeline of the effect:
+This is the motion blur pipeline:
 
 ![alt text](<readme_assets/motion blur pipeline.drawio.png>)
 
@@ -120,12 +120,22 @@ The pipeline uses Godot's depth, color and velocity textures, and 4 additional c
 
 ### Pre Processing Stage
 
+The implementation of this stage can be found in [pre_blur_processor.glsl](<addons\godot-motion-blur\pre_blur_processing\shader_stages\pre_blur_processor.glsl>).
+
 
 
 ### Tile Max X Stage
 
+The implementation of this stage can be found in [guertin_tile_max_x.glsl](<addons\godot-motion-blur\guertin\shader_stages\guertin_tile_max_x.glsl>).
+
 ### Tile Max Y Stage
+
+The implementation of this stage can be found in [guertin_tile_max_y.glsl](<addons\godot-motion-blur\guertin\shader_stages\guertin_tile_max_y.glsl>).
 
 ### Neighbor Max Stage
 
+The implementation of this stage can be found in [guertin_neighbor_max.glsl](<addons\godot-motion-blur\guertin\shader_stages\guertin_neighbor_max.glsl>).
+
 ### Motion Blur Stage
+
+The implementation of this stage can be found in [guertin_sphynx_blur.glsl](<addons\godot-motion-blur\guertin\shader_stages\guertin_sphynx_blur.glsl>).
