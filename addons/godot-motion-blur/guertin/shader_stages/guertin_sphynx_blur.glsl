@@ -222,6 +222,7 @@ void main() {
 #ifdef DEBUG
 		imageStore(debug_8_image, uvi, vec4(vn / render_size, uvi.x % params.tile_size == 0 || uvi.y %params.tile_size == 0 ? 1.0 : 0.0, 0.0));
 		imageStore(debug_1_image, uvi, base_color);
+		imageStore(debug_7_image, uvi, vec4(texelFetch(neighbor_max, uvi / params.tile_size, 0).xy / float(params.tile_size * 2), uvi.x % params.tile_size == 0 || uvi.y % params.tile_size == 0  ? 1.0 : 0.0, 0.0));
 #endif
 
 		return;

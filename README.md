@@ -59,11 +59,27 @@ Instead of saying that motion blur is the average of color over a period of time
 
 This is what the motion blur effect in this addon does.
 
+Let's say this is our input:
+
+![alt text](readme_assets/playground_1_plain_color.png)
+
+You can mentally divide the way this real-time motion blur works into 2 distinct processes:
+
+1. Smearing the current object's color. It uses the velocities directly written by the object, so it's confined to the object's silhouette. In addition to smearing the object's color, it accepts any color from geometry that's further from the camera than the object, achieving "fake transparency".
+![alt text](readme_assets/playground_1_x_weight_only.png)
+
+2. Accepting the extended blur of other objects. This requires some form of velocity dilation, which is the process of extending dominant velocities in the velocity texture beyond their original silhouettes. This dilated velocity texture is then used to "search" for objects that match that velocity and are closer to the camera than the current object, and blur them on top of it. In this example, the back wall sees dominant velocities from the cube, and collects color from it onto itself.
+![alt text](readme_assets/playground_1_y_weight_only.png)
+
+When designed to naturally complete each other, combining them results in a seamless and believable approximation.
+![alt text](readme_assets/playground_1_combined_weights.png)
+
+
 ### Godot's limitations
 
-Godot provides us with a motion-vectors texture, but it's not without its caveats:
+Godot provides us with a motion-vectors texture, and it's not without its caveats:
 
-- The user has no control over them, so they cannot be selectively disabled or enabled for meshes (custom motion vector support is in the works).
+- The user has no control over them, so they cannot be selectively disabled or enabled for individual meshes (custom motion vector support is in the works).
 - Motion vectors are not written for background and skyboxes
 - Some render settings like enabling FSR2 modify how these motion vectors behave.
 - Motion vectors are in UV space and in practice just point to the previous UV of the object.
@@ -78,8 +94,38 @@ This is the pipeline of the effect:
 
 ![alt text](<readme_assets/motion blur pipeline.drawio.png>)
 
-It uses the existing depth, velocity and color textures provided by godot. In addition it uses a texture to store custom processed velocities and depth, 2 textures to generate neighbor_max information and an output color texture.
+It uses the scene data buffer and depth, velocity and color textures provided by Godot. In addition it uses a texture to store custom processed velocities and depth, 2 textures to generate neighbor_max information and an output color texture.
 
 There are 5 compute stages in the pipeline:
 
-1. Pre Processing - This stage 
+1. **Pre Processing** - Takes the depth and velocity textures, as well as scene data, and Generates a processet velocity-depth texture with improved velocity and depth information. It's most crucial functionality is adding motion vectors to background pixels.
+
+2. **Tile Max X** - Finds and stores the largest velocity in each tile's row.
+
+3. **Tile Max Y** - Takes the result of Tile Max X, and performs a similar process, now vertically, resulting in a pixel-per-tile texture of the largest velocity found in each tile (Tile Max).
+
+4. **Neighbor Max** - Takes the Tile Max texture, and output a Neighbor Max texture, each pixel now containing the largest velocity found in each tile and its neighbors.
+
+5. **Motion Blur** - Takes the Neighbor Max texture, the processed velocitiy-depth texture, and Godot's color texture, and generates a motion blur approximation onto a Color Output texture.
+
+The pipeline uses Godot's depth, color and velocity textures, and 4 additional custom textures:
+
+1. **processed velocity-depth** `rgba16f | size = (render_size.x, render_size.y)` - stores the result of the Pre Processing stage.
+
+2. **tile max x / neighbor max** `rg8i | size = (render_size.x / tile_size, render_size.y)` - stores both the result of the Tile Max X stage, and then used again to store the result of the Neighbor Max stage. 
+
+3. **tile max** `rg8i | size = (render_size.x / tile_size, render_size.y / tile_size)` - stores the result of the Tile Max Y stage.
+
+4. **color output** `rgba16f | size = (render_size.x, render_size.y)` - stores the output of the Motion Blur stage
+
+### Pre Processing Stage
+
+
+
+### Tile Max X Stage
+
+### Tile Max Y Stage
+
+### Neighbor Max Stage
+
+### Motion Blur Stage
