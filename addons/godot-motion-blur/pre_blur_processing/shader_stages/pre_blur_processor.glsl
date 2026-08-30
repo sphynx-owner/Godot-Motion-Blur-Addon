@@ -5,6 +5,9 @@
 #define FLT_MIN 1.175494351e-38
 #define PIXEL_RADIUS_SQUARED 0.25
 
+// Arrived at via experimentation
+#define OBJECT_UV_CHANGE_EPSILON 0.0005
+
 layout(set = 0, binding = 0) uniform sampler2D depth_sampler;
 layout(set = 0, binding = 1) uniform sampler2D vector_sampler;
 layout(rgba16f, set = 0, binding = 2) uniform writeonly image2D vector_output;
@@ -127,7 +130,7 @@ void main() {
 
 	SceneData previous_scene_data = scene.prev_data;
 
-	vec2 uvn = vec2(uvi + vec2(0.5)) / render_size;
+	vec2 uvn = vec2(uvi + vec2(0.5) + vec2(0, -0.1)) / render_size;
 
 	// We get the view-space position at the pixel
 	// ---------------------------------------------------
@@ -217,7 +220,7 @@ void main() {
 
 	// By subtracting the "original" UV change stored on base_velocity from the manuall-derived
 	// camera UV change, we end up with the UV change that was caused by the object's motion
-	vec3 object_uv_change = base_velocity - camera_uv_change.xyz;
+	vec3 object_uv_change = base_velocity - camera_uv_change;
 
 	// Now that we have the 3 components that make the original motion vectors isolated, we
 	// can put them back together after tuning them however we like.
@@ -229,7 +232,7 @@ void main() {
 	// In the case of background pixels, it does not make much sense for them to have "depth velocity". In addition, the depth velocity
 	// of the background is very saturated since it's a point at infinity that covers large distances easily, and I worry
 	// about noise it might introduce.
-	if (depth == 0 || dot(object_uv_change.xy, object_uv_change.xy) > 0.000001) {
+	if (depth == 0 || dot(object_uv_change.xy, object_uv_change.xy) > OBJECT_UV_CHANGE_EPSILON) {
 		total_velocity.z = 0;
 		base_velocity.z = 0;
 	}
@@ -290,14 +293,14 @@ void main() {
 	// ---------------------------------------------------
 
 	// If depth == 0 (skybox), view_position.z is -inf, which can also be arithmetically achieved with (-1.0 / 0.0).
-	vec4 final_output = vec4(total_velocity, view_position.z);
+	vec4 final_output = vec4(total_velocity, -view_position.z);
 
 	imageStore(vector_output, uvi, final_output);
 
 #ifdef DEBUG
 	imageStore(debug_2_image, uvi, vec4(pow(texelFetch(depth_sampler, uvi, 0).x, 0.5)));
 	imageStore(debug_3_image, uvi, vec4(sampled_velocity, 0.0, 0.0));
-	imageStore(debug_4_image, uvi, vec4(final_output.xy / render_size, abs(final_output.z) / 20.0, 1.0));
+	imageStore(debug_4_image, uvi, vec4(final_output.xy / render_size, final_output.z, 1.0));
 	imageStore(debug_9_image, uvi, vec4(-(final_output.w) / 100.0));
 	imageStore(debug_10_image, uvi, vec4(-(final_output.w - final_output.z) / 100.0));
 	imageStore(debug_12_image, uvi, vec4(abs(final_output.z * view_position.w) / 100.0));
