@@ -180,10 +180,21 @@ The motion blur effect falls short at the lack of information. A common place wh
 
 At that point, the color-smearing process cannot pick color from foreground geometry onto itself, and the blur visibly reduces towards the cutoff.
 
+In this example, you can see the details being less blurred against edges of foreground geometry, as well as the edges of the screen:
 
+![alt text](readme_assets/without_double_sampling.png)
 
+To solve this, we can leverage the fact we are sampling in both directions, and reuse samples from the exposed direction instead of cutting samples off:
 
+![alt text](readme_assets/with_double_sampling.png)
 
+To pull this off, the motion blur samples in *both directions* at the same time, starting from the middle.
+
+This means that to get the same sampling resolution, we can iterate half as much, as we do double the sampling in each iteration.
+
+Then, if it runs into an invalid sample, it can see if the other side has a valid sample and use it instead.
+
+The reason this requires sampling in both directions at the same time, is to maintain the weight-distribution coherency. Trying to reuse old samples in the accumulated color sum would lead to inconsistencies in that regard.
 
 ### The Pipeline
 
