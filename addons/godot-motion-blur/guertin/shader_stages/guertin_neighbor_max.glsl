@@ -3,6 +3,8 @@
 
 #define FLT_MAX 3.402823466e+38
 #define FLT_MIN 1.175494351e-38
+#define COS_45 0.70710678118 // sqrt(2.0)/2.0
+#define SQRT_2 1.41421356237
 
 layout(set = 0, binding = 0) uniform isampler2D tile_max;
 layout(rg8i, set = 0, binding = 1) uniform writeonly iimage2D neighbor_max;
@@ -36,7 +38,7 @@ void main()
 
 	vec2 max_neighbor_velocity = vec2(0);
 
-	float max_neighbor_velocity_length_squared = 0;
+	float max_neighbor_velocity_length = 0;
 
 	for(int i = -1; i <= 1; i++)
 	{
@@ -55,18 +57,18 @@ void main()
 
 			vec2 current_neighbor_velocity = texelFetch(tile_max, current_uvi, 0).xy;
 
-			bool facing_center = dot(current_neighbor_velocity, current_offset) > 0;
+			float current_neighbor_velocity_length = length(current_neighbor_velocity);
 
-			if(is_diagonal && !facing_center)
+			bool can_reach_tile = abs(dot(current_neighbor_velocity / max(1e-6, current_neighbor_velocity_length), current_offset / SQRT_2)) > COS_45;
+
+			if(is_diagonal && !can_reach_tile)
 			{
 				continue;
 			}
 
-			float current_neighbor_velocity_length_squared = dot(current_neighbor_velocity, current_neighbor_velocity);
-
-			if(current_neighbor_velocity_length_squared > max_neighbor_velocity_length_squared)
+			if(current_neighbor_velocity_length > max_neighbor_velocity_length)
 			{
-				max_neighbor_velocity_length_squared = current_neighbor_velocity_length_squared;
+				max_neighbor_velocity_length = current_neighbor_velocity_length;
 
 				max_neighbor_velocity = current_neighbor_velocity;
 			}

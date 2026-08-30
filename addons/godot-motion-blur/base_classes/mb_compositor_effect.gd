@@ -48,7 +48,10 @@ const COLOR_OUTPUT_TEXTURE : StringName = "color_output"
 
 @export var transparent_bg: bool = false
 
-@export var support_fsr2 := true
+## When FSR2 is enabled on the viewport, this value must be enabled.
+# HACK @sphynx-owner: I would have enabled this value by default, but the feature
+# is not air tight and you can run into ugly edge cases. It's still pretty good for what it is.
+@export var support_fsr2 := false
 
 @export_storage var pre_blur_processor_stage: RDShaderFile = preload("res://addons/godot-motion-blur/pre_blur_processing/shader_stages/pre_blur_processor.glsl")
 

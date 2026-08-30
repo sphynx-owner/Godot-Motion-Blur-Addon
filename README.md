@@ -102,6 +102,14 @@ Godot provides us with a motion-vectors texture, and it's not without its caveat
 
 I am solving some of these issues in this addon.
 
+### Z Velocities
+
+Most standard motion blur implementations use the xy channels to store velocity onto a texture. It works very well, but the lack of z velocity information (how fast the object moves towards or away from the camera) can lead to unwanted artifacts in scenarios where depth velocities are dominant.
+
+The most common of which could be found in racing games. Considering that the racing games genre is amongst the most valid genres to apply motion blur to, it makes accounting for such artifacts a worthy task.
+
+As described in [this section](#real-time-post-process-motion-blur-is-different), whether objects are closer or further from the camera than other objects matter in how they are blurred.
+
 ### The Pipeline
 
 This is the motion blur pipeline:
@@ -152,7 +160,7 @@ In the current implementation, this stage is also in charge of other nice-to-hav
 
 #### Implementation Walkthrough
 
-Godot provides scene information that we can use inside compute shaders in the form of uniform buffers, their struct starts like this.
+Godot provides scene information buffers that we can use inside compute shaders. Their struct starts like this.
 
 ```glsl
 struct SceneData {
@@ -165,7 +173,7 @@ struct SceneData {
 .
 ```
 
-A key detail is that we get an identical struct containing information from the *previous frame*.
+A key detail is that we get a similar struct containing information from the *previous frame*.
 
 ```glsl
 layout(set = 0, binding = 3, std140) uniform SceneDataBlock {
@@ -178,12 +186,14 @@ scene;
 Using Godot's depth texture and the matrices in the scene data, we can convert the depth and UV of a pixel into a view position.
 
 ```glsl
+float depth = texelFetch(depth_sampler, uvi, 0).x;
+
 vec4 view_position = scene_data.inv_projection_matrix * vec4(uv_to_ndc(uvn), depth, 1.0);
 
 view_position.xyz /= view_position.w;
 ```
 
-We take the view position, transform it to a world position, and then back to a view position using the *past* view matrix, resulting in an estimation of where the pixel was last frame. This estimation only works for static environment. It breaks for moving objects.
+We take the view position, transform it to a world position, and then back to a view position using the *previous view matrix*, resulting in an estimation of where the pixel was last frame in view space. This estimation only works for static environment. It breaks for moving objects.
 
 ```glsl
 mat4 inv_view_matrix = view_mat3x4_to_mat4(scene_data.inv_view_matrix);
@@ -195,7 +205,7 @@ mat4 prev_view_matrix = view_mat3x4_to_mat4(previous_scene_data.view_matrix);
 vec4 view_past_position = prev_view_matrix * vec4(world_position.xyz, 1.0);
 ```
 
-We extract a UV change (and an additional, view-space depth change component).
+We extract a UV change (and an additional, view-space depth change component, which will be the z velocity).
 
 ```glsl
 vec4 view_past_ndc = previous_scene_data.projection_matrix * view_past_position;
@@ -264,19 +274,12 @@ if (params.support_fsr2 > 0.5) {
 }
 ```
 
-In Godot, background and skyboxes do not write to the velocity buffer.
-However, our manually-extracted UV change uses the view-matrices and the depth buffer to generate
-equivalent velocities, and it works even when the depth is 0 (infinity/background).
-Assuming the skybox is always static (does not move on its own), the value we extracted
-can serve as the ground truth.
-We set the base velocity to that of the manually extracted vectors, and only override
-the xy channels if there's a valid value in the velocity buffer. That way I am accounting for a 
-scenario where objects may write to the velocity buffer and not the depth buffer.
+In Godot, background and skyboxes do not write to the velocity buffer. However, our manually-extracted UV change uses the view-matrices and the depth buffer to generate equivalent velocities, and it works even when the depth is 0 (infinity/background). Assuming the skybox is always static (does not move on its own), the value we extracted can serve as the ground truth. We set the base velocity to that of the manually extracted vectors, and keep it if the depth is 0 (background depth). It's not currently possible, but in the future you may be able to write to the veolcity buffer without writing to the depth buffer, so I'm checking for non-zero velocity as well just to be safe.
 
 ```glsl
 vec3 base_velocity = camera_uv_change;
 
-if (dot(sampled_velocity, sampled_velocity) > 0)
+if (dot(sampled_velocity * render_size, sampled_velocity * render_size) > PIXEL_RADIUS_SQUARED || depth > 0)
 {
     base_velocity.xy = sampled_velocity;
 }
@@ -291,9 +294,7 @@ vec3 object_uv_change = base_velocity - camera_uv_change.xyz;
 Now that we have the 3 components that make the original motion vectors isolated, we can put them back together after tuning them however we like. We assume that component magnitudes are between 0 and 1. This must be enforced on the editor interface level.
 
 ```glsl
-vec3 total_velocity = camera_rotation_uv_change * params.rotation_velocity_multiplier
-+ camera_movement_uv_change * params.movement_velocity_multiplier
-+ object_uv_change * params.object_velocity_multiplier;
+vec3 total_velocity = camera_rotation_uv_change * params.rotation_velocity_multiplier + camera_movement_uv_change * params.movement_velocity_multiplier + object_uv_change * params.object_velocity_multiplier;
 ```
 
 If depth == 0 (skybox), or the objcet is not static (has some object uv change), clear z velocity. The z velocity was manually extracted using view matrices and thus can only be safely assumed for static environment. In the case of background pixels, it does not make much sense for them to have "depth velocity". In addition, the depth velocity of the background is very saturated since it's a point at infinity that covers large distances easily, and I worry about noise it might introduce.
@@ -389,6 +390,31 @@ Takes the resulting **tile max x** texture from the previous stage, and searches
 
 The implementation of this stage can be found in [guertin_neighbor_max.glsl](<addons\godot-motion-blur\guertin\shader_stages\guertin_neighbor_max.glsl>).
 
+#### Purpose
+
+This the velocity dilation stage. Dominant velocities are extended onto neighboring tiles.
+
+#### Implementation Details
+
+The implementation is also pretty straight forward, except for the diagonal tile discarding logic.
+
+The way it works is that it discards of diagonal tiles that the velocity could never reach.
+
+```glsl
+bool is_diagonal = i != 0 && j != 0;
+
+vec2 current_neighbor_velocity = texelFetch(tile_max, current_uvi, 0).xy;
+
+float current_neighbor_velocity_length = length(current_neighbor_velocity);
+
+bool can_reach_tile = abs(dot(current_neighbor_velocity / max(1e-6, current_neighbor_velocity_length), current_offset / SQRT_2)) > COS_45;
+
+if(is_diagonal && !can_reach_tile)
+{
+    continue;
+}
+```
+![alt text](readme_assets/neighbor_max_diagonal_discarding.gif)
 ### Motion Blur Stage
 
 The implementation of this stage can be found in [guertin_sphynx_blur.glsl](<addons\godot-motion-blur\guertin\shader_stages\guertin_sphynx_blur.glsl>).

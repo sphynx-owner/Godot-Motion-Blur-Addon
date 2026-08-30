@@ -3,6 +3,7 @@
 
 #define FLT_MAX 3.402823466e+38
 #define FLT_MIN 1.175494351e-38
+#define PIXEL_RADIUS_SQUARED 0.25
 
 layout(set = 0, binding = 0) uniform sampler2D depth_sampler;
 layout(set = 0, binding = 1) uniform sampler2D vector_sampler;
@@ -126,12 +127,12 @@ void main() {
 
 	SceneData previous_scene_data = scene.prev_data;
 
-	float depth = texelFetch(depth_sampler, uvi, 0).x;
-
 	vec2 uvn = vec2(uvi + vec2(0.5)) / render_size;
 
 	// We get the view-space position at the pixel
 	// ---------------------------------------------------
+	float depth = texelFetch(depth_sampler, uvi, 0).x;
+	
 	vec4 view_position = scene_data.inv_projection_matrix * vec4(uv_to_ndc(uvn), depth, 1.0);
 
 	view_position.xyz /= view_position.w;
@@ -202,18 +203,13 @@ void main() {
 		}
 	}
 
-	// In Godot, background and skyboxes do not write to the velocity buffer.
-	// However, our manually-extracted UV change uses the view-matrices and the depth buffer to generate
-	// equivalent velocities, and it works even when the depth is 0 (infinity/background).
-	// Assuming the skybox is always static (does not move on its own), the value we extracted
-	// can serve as the ground truth.
-	// We set the base velocity to that of the manually extracted vectors, and only override
-	// the xy channels if there's a valid value in the velocity buffer. That way I am accounting for a 
-	// scenario where objects may write to the velocity buffer and not the depth buffer.
+	/**
+	In Godot, background and skyboxes do not write to the velocity buffer. However, our manually-extracted UV change uses the view-matrices and the depth buffer to generate equivalent velocities, and it works even when the depth is 0 (infinity/background). Assuming the skybox is always static (does not move on its own), the value we extracted can serve as the ground truth. We set the base velocity to that of the manually extracted vectors, and keep it if the depth is 0 (background depth). It's not currently possible, but in the future you may be able to write to the veolcity buffer without writing to the depth buffer, so I'm checking for non-zero velocity as well just to be safe.
+	**/
 	// ---------------------------------------------------
 	vec3 base_velocity = camera_uv_change;
 
-	if (dot(sampled_velocity, sampled_velocity) > 0)
+	if (dot(sampled_velocity * render_size, sampled_velocity * render_size) > PIXEL_RADIUS_SQUARED || depth > 0)
 	{
 		base_velocity.xy = sampled_velocity;
 	}
@@ -226,9 +222,7 @@ void main() {
 	// Now that we have the 3 components that make the original motion vectors isolated, we
 	// can put them back together after tuning them however we like.
 	// We assume that component magnitudes are between 0 and 1. This must be enforced on the editor interface level.
-	vec3 total_velocity = camera_rotation_uv_change * params.rotation_velocity_multiplier
-	+ camera_movement_uv_change * params.movement_velocity_multiplier
-	+ object_uv_change * params.object_velocity_multiplier;
+	vec3 total_velocity = camera_rotation_uv_change * params.rotation_velocity_multiplier + camera_movement_uv_change * params.movement_velocity_multiplier + object_uv_change * params.object_velocity_multiplier;
 
 	// If depth == 0 (skybox), or the objcet is not static (has some object uv change), clear z velocity.
 	// The z velocity was manually extracted using view matrices and thus can only be safely assumed for static environment.
