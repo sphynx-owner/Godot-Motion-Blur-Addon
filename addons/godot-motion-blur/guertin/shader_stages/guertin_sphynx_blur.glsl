@@ -36,18 +36,16 @@ layout(push_constant, std430) uniform Params
 	int tile_size;
 	int sample_count;
 	int frame;
-	int velocity_depth_test;
 	int transparent_bg;
-	int nan1;
-	int nan2;
-	int nan3;
 } params;
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 // Guertin's functions https://research.nvidia.com/sites/default/files/pubs/2013-11_A-Fast-and/Guertin2013MotionBlur-small.pdf
 // ----------------------------------------------------------
-#define soft_compare(a, b, sze) clamp(sze * (a - b), 0, 1)
+float soft_compare(float a, float b, float sze) {
+	return clamp(sze * (a - b), 0, 1);
+}
 // ----------------------------------------------------------
 
 // from https://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare/
@@ -89,7 +87,7 @@ vec4 sample_x_velocity(vec2 x, float t, vec2 vx, float zx, float vzx, ivec2 rend
 
 	float zyx = syx.w;
 
-	x_weight = 1 - soft_compare(-zx + (params.velocity_depth_test == 1 ? vzx * t : 0), -zyx, -10);
+	x_weight = 1 - soft_compare(zx, zyx + vzx * t, 10);
 
 	return textureLod(color_sampler, yx, 0.0);
 }
@@ -114,7 +112,7 @@ vec4 sample_y_velocity(vec2 x, float t, vec2 vn, float vn_length, vec2 wvn, floa
 
 	// We get whether the depth at the sample position plus offset derived from the z velocity is in front
 	// of the depth at the current pixel. Starts at 0 when same depth, and goes to 1 the closer it is.
-	float overlapn = 1 - soft_compare(-zyn - (params.velocity_depth_test == 1 ? vzyn * t : 0), -zx, -10);
+	float overlapn = 1 - soft_compare(zyn + vzyn * t, zx, 10);
 	
 	// If the found velocity is smaller than a pixel's radius, exit early.
 	if (vyn_length < PIXEL_RADIUS || overlapn <= EPSILON)

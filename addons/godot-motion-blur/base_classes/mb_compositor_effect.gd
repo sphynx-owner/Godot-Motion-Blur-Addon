@@ -35,8 +35,6 @@ const COLOR_OUTPUT_TEXTURE : StringName = "color_output"
 ## sutter speeds at that framerate, and up.
 @export var target_constant_framerate : float = 30
 
-@export var velocity_depth_test := true
-
 ## Modifies the otherwise regular average color over time
 ## to be weighted average over time based on a distribution curve.
 ## flat line is equivalent to the default, and you can choose 
