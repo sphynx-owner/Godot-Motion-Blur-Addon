@@ -13,6 +13,7 @@ Table of contents:
     - [Godot's limitaions](#godots-limitations)
     - [Z Velocities](#z-velocities)
     - [Centered Blur](#centered-blur)
+    - [Taking Centered Blur a Step Further](#taking-centered-blur-a-step-further)
     - [The Pipeline](#the-pipeline)
     - **Stages**:
         - [Pre Processing Stage](#pre-processing-stage)
@@ -97,7 +98,7 @@ You can mentally divide the way the real-time motion blur works into 2 distinct 
 2. ***Accepting the extended blur of other objects*** - This requires some form of velocity dilation, which extends dominant velocities in the velocity texture beyond their original silhouettes. The dilated velocities are then used to "search" for objects that match in their velocity and are closer to the camera than the current object. We then blur these objects onto the current object. In this example, the back wall sees dominant velocities from the cube, and collects color from it onto itself.
 ![alt text](readme_assets/playground_1_y_weight_only.png)
 
-When designed to naturally complete each other, combining them results in a seamless and believable approximation.
+When designed to naturally complete each other, combining the two processes results in a seamless and believable approximation.
 ![alt text](readme_assets/playground_1_combined_weights.png)
 
 ### Godot's limitations
@@ -107,7 +108,7 @@ Godot provides us with a motion-vectors texture, and it's not without its caveat
 - The user has no control over them, so they cannot be selectively disabled or enabled for individual meshes (custom motion vector support is in the works).
 - Motion vectors are not written for background and skyboxes
 - Some render settings like enabling FSR2 modify how these motion vectors behave.
-- Motion vectors are in UV space and in practice just point to the previous UV of the object.
+- Motion vectors are in UV space and when negated just point to the previous UV of the object.
 - As of now there are glitches with objects that are spawned in, and sharp direction changes of the camera movement.
 - If the camera moves backwards really fast along a surface, you can see velocity vectors that point to a position behind the camera's near clip plane. This leads to these velocities being flipped, and in addition results in asymptotical behavior the closer these previos positions are to the near clip plane.
 
@@ -169,13 +170,28 @@ Here are the crucial benefits that make centered blurring non-negotiable:
 
 4. Dilated velocities work in both direction, so if objects move in opposite directions the same dilated velocity can take care of extending the blur for both objects. Another crucial improvement to visual robustness.
 
+### Taking Centered Blur a Step Further
+
+Industry standard motion blur implementations run their sampling processes from one end of the offset velocity range, to the other. So most commonly you will see implementations that start at an offset of `-0.5 * velocity`, and finish at `0.5 * velocity`, sampling at regular intervals along that range.
+
+What happens when there's nothing for the blur to work with?
+
+The motion blur effect falls short at the lack of information. A common place where that can happen is when objects move and disappear behind stationary geometry.
+
+At that point, the color-smearing process cannot pick color from foreground geometry onto itself, and the blur visibly reduces towards the cutoff.
+
+
+
+
+
+
 ### The Pipeline
 
 This is the motion blur pipeline:
 
 ![alt text](<readme_assets/motion blur pipeline.drawio.png>)
 
-It uses the scene data buffer and depth, velocity and color textures provided by Godot. In addition it uses a texture to store custom processed velocities and depth, 2 textures to generate neighbor_max information and an output color texture.
+It uses the scene data buffer and the depth, velocity and color textures provided by Godot. In addition it uses a texture to store custom processed velocities and depth, 2 textures to generate neighbor_max information and an output color texture.
 
 There are 5 compute stages in the pipeline:
 

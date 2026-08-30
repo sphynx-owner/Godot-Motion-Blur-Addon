@@ -170,7 +170,7 @@ void blend_blur(
 
 	float current_color_weight = max(current_color.a, 1 - params.transparent_bg);
 
-	color_sum += vec4(current_color.xyz * current_color_weight, current_color.a);
+	color_sum += vec4(current_color.rgb * current_color_weight, current_color.a);
 
 	color_weight += current_color_weight;
 
@@ -248,7 +248,7 @@ void main() {
 	float alpha_weight = EPSILON;
 
 	// Create an initial color sum
-	vec4 sum = vec4(base_color.xyx * base_color.a * color_weight, base_color.a * alpha_weight);
+	vec4 sum = vec4(base_color.rgb * base_color.a * color_weight, base_color.a * alpha_weight);
 
 	for(int i = 0; i < params.sample_count; i++)
 	{
@@ -281,7 +281,7 @@ void main() {
 		blend_blur(base_color, neg_x_sample, neg_x_weight, x_sample, x_weight, neg_y_sample, neg_y_weight, sum, color_weight, alpha_weight);
 	}
 
-	sum.xyz /= color_weight;
+	sum.rgb /= color_weight;
 	sum.a /= alpha_weight;
 
 	imageStore(output_color, uvi, sum);
