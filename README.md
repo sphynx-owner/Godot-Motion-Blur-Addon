@@ -104,11 +104,29 @@ I am solving some of these issues in this addon.
 
 ### Z Velocities
 
-Most standard motion blur implementations use the xy channels to store velocity onto a texture. It works very well, but the lack of z velocity information (how fast the object moves towards or away from the camera) can lead to unwanted artifacts in scenarios where depth velocities are dominant.
+Most standard motion blur implementations use the xy channels to store velocity onto a texture. It works very well, but the lack of z velocity information (how fast the object moves towards or away from the camera) can lead to unwanted artifacts in scenarios where these velocities are dominant.
 
-The most common of which could be found in racing games. Considering that the racing games genre is amongst the most valid genres to apply motion blur to, it makes accounting for such artifacts a worthy task.
+Such scenarios can be commonly found in racing games, where you can see the road disappear or appear from under a speeding car. Considering that the racing game genre is amongst the most valid genres to apply motion blur to, it makes accounting for such artifacts a worthy task.
 
-As described in [this section](#real-time-post-process-motion-blur-is-different), whether objects are closer or further from the camera than other objects matter in how they are blurred.
+As described in [this section](#real-time-post-process-motion-blur-is-different), The depth of objects matter in how they are blurred. Objects smear their own color and the color of any objects further than them, and they accept the color of dominant-velocity objects that are in front of them.
+
+So what happens when something moves away from the camera, like the road under a speeding car?
+
+If we only use the xy velocity of the road (it's perceived change), we can only use the static depth information from the depth texture to compare against the car.
+
+This means that the portion of the road that's in front of the car is treated as if it moves upwards in 2 dimensions. Since it's closer to the camera than the car is, the car thinks it should accept that road as a foreground, dominant-velocity object, blurring it on top. From the road's perspective, it looks to smear its color, and because it is in front of the car, it treats the car as background, and adds color from it to fake its own transparency.
+
+These artifacts look like this:
+
+![alt text](readme_assets/without_z_velocity.png)
+
+If we have the z component of the velocity, we can use it when testing the depth of the road, so by the time samples reach the car they are also aware of how much more further they are from the camera, and thus behind the car.
+
+The car also knows that by the time it's dominant velocity sampling reaches the road, that road is further and further away from the camera, and it does not sample from it.
+
+This is the result:
+
+![alt text](readme_assets/with_z_velocity.png)
 
 ### The Pipeline
 
