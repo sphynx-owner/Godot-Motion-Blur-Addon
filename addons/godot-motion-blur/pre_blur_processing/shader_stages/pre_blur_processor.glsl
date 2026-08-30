@@ -139,8 +139,7 @@ void main() {
 
 	mat4 inv_view_matrix = view_mat3x4_to_mat4(scene_data.inv_view_matrix);
 	
-	// We take the view position, transform it to a world position, and then back to a view position,
-	// but this time under the past view position, resulting in an estimation of where the pixel
+	// We take the view position, transform it to a world position, and then back to a view position using the past view matrix, resulting in an estimation of where the pixel
 	// was last frame. This estimation only works for static environment. It breaks for moving objects.
 	// ---------------------------------------------------
 	vec4 world_position = inv_view_matrix * vec4(view_position.xyz, 1.0);
@@ -183,6 +182,26 @@ void main() {
 	// at the UV change that was cause by the camera's movement.
 	vec3 camera_movement_uv_change = camera_uv_change - camera_rotation_uv_change;
 
+	// Get a velocity sample
+	vec2 sampled_velocity = texelFetch(vector_sampler, uvi, 0).xy;
+
+	// FSR2 alters the velocity buffer in a very specific way:
+	// 1. Static geometry has its velocity replaced with a vec2(-1).
+	// 2. Around the edges of moving geometry there are some pixels that have their velocities *divided by 2* and then added a vec2(-0.5).
+	// The following code attempts to account for that, but it would 
+	// fail if valid velocities happen to land on these looked-for edge cases.
+	if (params.support_fsr2 > 0.5) {
+		if (sampled_velocity == vec2(-1)) {
+			sampled_velocity = camera_uv_change.xy;
+		}
+
+		vec2 potential_replacement = (sampled_velocity + 0.5) * 2.0;
+
+		if (dot(potential_replacement, potential_replacement) < dot(sampled_velocity, sampled_velocity)) {
+			sampled_velocity = potential_replacement;
+		}
+	}
+
 	// In Godot, background and skyboxes do not write to the velocity buffer.
 	// However, our manually-extracted UV change uses the view-matrices and the depth buffer to generate
 	// equivalent velocities, and it works even when the depth is 0 (infinity/background).
@@ -194,18 +213,11 @@ void main() {
 	// ---------------------------------------------------
 	vec3 base_velocity = camera_uv_change;
 
-	vec2 sampled_velocity = texelFetch(vector_sampler, uvi, 0).xy;
-
 	if (dot(sampled_velocity, sampled_velocity) > 0)
 	{
 		base_velocity.xy = sampled_velocity;
 	}
 	// ---------------------------------------------------
-
-	// fsr just makes it so values are larger than 1, I assume its the only case when it happens
-	if (params.support_fsr2 > 0.5 && dot(base_velocity.xy, base_velocity.xy) >= 1) {
-		base_velocity = camera_uv_change;
-	}
 
 	// By subtracting the "original" UV change stored on base_velocity from the manuall-derived
 	// camera UV change, we end up with the UV change that was caused by the object's motion
@@ -217,13 +229,6 @@ void main() {
 	vec3 total_velocity = camera_rotation_uv_change * params.rotation_velocity_multiplier
 	+ camera_movement_uv_change * params.movement_velocity_multiplier
 	+ object_uv_change * params.object_velocity_multiplier;
-
-	// If depth == 0 (skybox), we set the z velocity to 0.
-	if (depth == 0)
-	{
-		total_velocity.z = 0;
-		base_velocity.z = 0;
-	}
 
 	// If depth == 0 (skybox), or the objcet is not static (has some object uv change), clear z velocity.
 	// The z velocity was manually extracted using view matrices and thus can only be safely assumed for static environment.
@@ -258,7 +263,7 @@ void main() {
 	}
 	// ---------------------------------------------------
 
-	// Here is where the intensity is applied, customized by the user.
+	// Here is where the intensity parameter is applied, customized by the user.
 	total_velocity *= params.motion_blur_intensity;
 	
 	// Here is where we apply the velocity thresholds, customized by the user.
@@ -296,8 +301,8 @@ void main() {
 	imageStore(vector_output, uvi, final_output);
 
 #ifdef DEBUG
-	imageStore(debug_2_image, uvi, vec4(pow(textureLod(depth_sampler, uvn, 0.0).x, 0.5)));
-	imageStore(debug_3_image, uvi, vec4(textureLod(vector_sampler, uvn, 0.0).xy, 0.0, 0.0));
+	imageStore(debug_2_image, uvi, vec4(pow(texelFetch(depth_sampler, uvi, 0).x, 0.5)));
+	imageStore(debug_3_image, uvi, vec4(sampled_velocity, 0.0, 0.0));
 	imageStore(debug_4_image, uvi, vec4(final_output.xy / render_size, abs(final_output.z) / 20.0, 1.0));
 	imageStore(debug_9_image, uvi, vec4(-(final_output.w) / 100.0));
 	imageStore(debug_10_image, uvi, vec4(-(final_output.w - final_output.z) / 100.0));
