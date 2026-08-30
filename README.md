@@ -8,6 +8,17 @@ Table of contents:
 - [**Background**](#background)
 
 - [**Technical Overview**](#technical-overview)
+    - [What Is Motion Blur](#what-is-motion-blur)
+    - [Real-Time Post-Process Motion Blur is Different](#real-time-post-process-motion-blur-is-different)
+    - [Godot's limitaions](#godots-limitations)
+    - [Z Velocities](#z-velocities)
+    - [The Pipeline](#the-pipeline)
+    - **Stages**:
+        - [Pre Processing Stage](#pre-processing-stage)
+        - [Tile Max X Stage](#tile-max-x-stage)
+        - [Tile Max Y Stage](#tile-max-y-stage)
+        - [Neighbor Max Stage](#neighbor-max-stage)
+        - [Motion Blur Stage](#motion-blur-stage)
 
 ## Guide
 
@@ -436,3 +447,10 @@ if(is_diagonal && !can_reach_tile)
 ### Motion Blur Stage
 
 The implementation of this stage can be found in [guertin_sphynx_blur.glsl](<addons\godot-motion-blur\guertin\shader_stages\guertin_sphynx_blur.glsl>).
+
+#### Purpose
+
+This stage generates the motion blur.
+
+#### Implementation Walkthrough
+
