@@ -12,6 +12,7 @@ Table of contents:
     - [Real-Time Post-Process Motion Blur is Different](#real-time-post-process-motion-blur-is-different)
     - [Godot's limitaions](#godots-limitations)
     - [Z Velocities](#z-velocities)
+    - [Centered Blur](#centered-blur)
     - [The Pipeline](#the-pipeline)
     - **Stages**:
         - [Pre Processing Stage](#pre-processing-stage)
@@ -84,7 +85,7 @@ Instead of saying that motion blur is the average of color over a period of time
 
 This is what the motion blur effect in this addon does.
 
-Let's say this is our input:
+Let's say this is our input (the cube is moving to the left):
 
 ![alt text](readme_assets/playground_1_plain_color.png)
 
@@ -93,12 +94,11 @@ You can mentally divide the way the real-time motion blur works into 2 distinct 
 1. ***Smearing the current object's color*** - This uses the velocities directly written by the current object, so it's confined to the current object's silhouette. In addition to smearing the current object's color, it accepts any color from geometry that's further from the camera than the current object, achieving "fake transparency".
 ![alt text](readme_assets/playground_1_x_weight_only.png)
 
-2. ***Accepting the extended blur of other objects*** - This requires some form of velocity dilation, which is the process of extending dominant velocities in the velocity texture beyond their original silhouettes. This dilated velocity texture is then used to "search" for objects that match that velocity and are closer to the camera than the current object, and blur them on top of it. In this example, the back wall sees dominant velocities from the cube, and collects color from it onto itself.
+2. ***Accepting the extended blur of other objects*** - This requires some form of velocity dilation, which extends dominant velocities in the velocity texture beyond their original silhouettes. The dilated velocities are then used to "search" for objects that match in their velocity and are closer to the camera than the current object. We then blur these objects onto the current object. In this example, the back wall sees dominant velocities from the cube, and collects color from it onto itself.
 ![alt text](readme_assets/playground_1_y_weight_only.png)
 
 When designed to naturally complete each other, combining them results in a seamless and believable approximation.
 ![alt text](readme_assets/playground_1_combined_weights.png)
-
 
 ### Godot's limitations
 
@@ -138,6 +138,36 @@ The car also knows that by the time it's dominant velocity sampling reaches the 
 This is the result:
 
 ![alt text](readme_assets/with_z_velocity.png)
+
+### Centered Blur
+
+An aspect to consider when implementing motion blur, is the offset along the velocity in which we blur.
+
+The industry standard is of a *centered* approach, where you start blurring from half a velocity before the object, all the way to half a velocity past the object. The result is that the object is blurred equally in both directions, hence it is "centered".
+
+You can see this behavior in the example of [a previous section](#real-time-post-process-motion-blur-is-different).
+
+Engines like Unreal Engine provide tangential velocities in its velcoity texture, derived from the object's linear and angular velocity values. They work well with centered blur, as tangent velocities estimate the object's actual trajectory equally well both forwards and backwards.
+
+However, Godot's velocity texture is actually just a negated UV-change texture. So the negated value of each pixel points to it's past screen UV.
+
+This means that the "most correct' blurring in godot would happen *backwards* in time, bridging the object to its past position.
+
+But it should **never** be done.
+
+This has been a pitfall I was trapped in when I first started developing the motion blur effect. It made sense as blur appeared to "overshoot" less that way.
+
+But the cost of committing to backwards blurring revealed to dwarf the trajectory-estimation accuracy benefit.
+
+Here are the crucial benefits that make centered blurring non-negotiable:
+
+1. Reduces velocity dilation magnitude requirements by half, since the resulting blur's magnitude is half of the velocity magnitude. This reason alone is already enough. It meant that novel velocity dilation methods like the jump flood technique I created were absolutely overkill compared to the industry standard tile-based approaches, rendering it obsolete.
+
+2. Dilating velocities and performing the blur is greatly simplified since we don't need to perform directionality checks as much. Whether the velocity is towards or away from us is equivalent in many cases.
+
+3. You don't have to fake transparency of objects as much, and the faked transparency portion is better hidden in the middle of the blur, instead of sticking out like a sore thumb at the edge of it. This alone is also enough of a reason. The improvement in visual robustness is significant.
+
+4. Dilated velocities work in both direction, so if objects move in opposite directions the same dilated velocity can take care of extending the blur for both objects. Another crucial improvement to visual robustness.
 
 ### The Pipeline
 
