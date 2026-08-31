@@ -293,14 +293,16 @@ void main() {
 	// ---------------------------------------------------
 
 	// If depth == 0 (skybox), view_position.z is -inf, which can also be arithmetically achieved with (-1.0 / 0.0).
-	vec4 final_output = vec4(total_velocity, -view_position.z);
+	// total_velocity up to this point was backwards, because it was derived using UV differences, which were vectors
+	// pointing to the previous UV, meaning the velocity of the pixel is in the other direction.
+	vec4 final_output = vec4(-total_velocity, view_position.z);
 
 	imageStore(vector_output, uvi, final_output);
 
 #ifdef DEBUG
 	imageStore(debug_2_image, uvi, vec4(pow(texelFetch(depth_sampler, uvi, 0).x, 0.5)));
-	imageStore(debug_3_image, uvi, vec4(sampled_velocity, 0.0, 0.0));
-	imageStore(debug_4_image, uvi, vec4(final_output.xy / render_size, final_output.z, 1.0));
+	imageStore(debug_3_image, uvi, vec4(-sampled_velocity, 0.0, 0.0));
+	imageStore(debug_4_image, uvi, vec4(vec2(uvi) / vec2(render_size), final_output.z , 1.0));
 	imageStore(debug_9_image, uvi, vec4(-(final_output.w) / 100.0));
 	imageStore(debug_10_image, uvi, vec4(-(final_output.w - final_output.z) / 100.0));
 	imageStore(debug_12_image, uvi, vec4(abs(final_output.z * view_position.w) / 100.0));

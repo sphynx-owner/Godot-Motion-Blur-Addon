@@ -7,6 +7,8 @@
 #define EPSILON 1e-6
 #define PIXEL_RADIUS 0.5
 #define PIXEL_RADIUS_SQUARED 0.25
+#define DEPTH_DIFF_TOLERANCE 2
+#define DEPTH_DIFF_LOW_TOLERANCE 0.1
 
 // NOTE @sphynx-owner: the velocity texture sampler must have the filtering set to nearest.
 #define sample_velocity(velocity_texture, uv) textureLod(velocity_texture, uv, 0.0)
@@ -78,21 +80,39 @@ ivec2 jitter_tile(ivec2 uvi) {
 }
 // ----------------------------------------------------------
 
-vec4 sample_x_velocity(vec2 x, float t, vec2 vx, float zx, float vzx, ivec2 render_size, out float x_weight) {
+vec4 sample_x_velocity(vec2 x, float t, vec2 vx, float vx_length, vec2 wvx, float zx, float vzx, ivec2 render_size, out float x_weight) {
 	// TODO @sphynx-owner: do we need to divide by render
 	// size?
 	vec2 yx = x + t * vx / vec2(render_size);
 
 	vec4 syx = sample_velocity(velocity_sampler, yx);
 
+	vec2 vyx = syx.xy;
+
+	float vyx_length = length(vyx);
+
+	float tx = abs(t * vx_length);
+
+	vec2 wvyx = vyx / vyx_length;
+
+	float projected = abs(dot(wvyx, wvx));
+
+	float reaches_weight = step(tx, vyx_length / 2.0 * projected);// * pow(vx_length / vyx_length, 0.5);
+
 	float zyx = syx.w;
 
-	x_weight = 1 - soft_compare(zx, zyx + vzx * t, 10);
+	float vzyx = syx.z;
+
+	float overlap_x = soft_compare(zx + vzx * t, zyx + vzyx * t, DEPTH_DIFF_TOLERANCE);
+
+	float soft_overlap_x = 1 - soft_compare(zyx + vzyx * t, zx + vzx * t, DEPTH_DIFF_LOW_TOLERANCE);
+
+	x_weight = max(clamp(reaches_weight, 0, 1) * soft_overlap_x, overlap_x);//overlap_x;//
 
 	return textureLod(color_sampler, yx, 0.0);
 }
 
-vec4 sample_y_velocity(vec2 x, float t, vec2 vn, float vn_length, vec2 wvn, float zx, ivec2 render_size, out float y_weight) {
+vec4 sample_y_velocity(vec2 x, float t, vec2 vn, float vn_length, vec2 wvn, float zx, float vzx, ivec2 render_size, out float y_weight) {
 	// The sample positon along the neighbor_max velocity.
 	vec2 yn = x + t * vn / vec2(render_size);
 
@@ -112,7 +132,7 @@ vec4 sample_y_velocity(vec2 x, float t, vec2 vn, float vn_length, vec2 wvn, floa
 
 	// We get whether the depth at the sample position plus offset derived from the z velocity is in front
 	// of the depth at the current pixel. Starts at 0 when same depth, and goes to 1 the closer it is.
-	float overlapn = 1 - soft_compare(zyn + vzyn * t, zx, 10);
+	float overlapn = soft_compare(zyn - vzyn * t, zx + vzx * t, DEPTH_DIFF_TOLERANCE);
 	
 	// If the found velocity is smaller than a pixel's radius, exit early.
 	if (vyn_length < PIXEL_RADIUS || overlapn <= EPSILON)
@@ -231,6 +251,10 @@ void main() {
 	// We normalize neighbor-max velocity
 	vec2 wvn = vn / vn_length;
 
+	float vx_length = length(vx);
+
+	vec2 wvx = vx / vx_length;
+
 	// Get the depth at current pixel
 	float zx = sx.w;
 
@@ -262,19 +286,19 @@ void main() {
 
 		float x_weight;
 		
-		vec4 x_sample = sample_x_velocity(x, t, vx, zx, vzx, render_size, x_weight);
+		vec4 x_sample = sample_x_velocity(x, t, vx, vx_length, wvx, zx, vzx, render_size, x_weight);
 		
 		float neg_x_weight;
 
-		vec4 neg_x_sample = sample_x_velocity(x, neg_t, vx, zx, vzx, render_size, neg_x_weight);
+		vec4 neg_x_sample = sample_x_velocity(x, neg_t, vx, vx_length, wvx, zx, vzx, render_size, neg_x_weight);
 
 		float y_weight;
 
-		vec4 y_sample = sample_y_velocity(x, t, vn, vn_length, wvn, zx, render_size, y_weight);
+		vec4 y_sample = sample_y_velocity(x, t, vn, vn_length, wvn, zx, vzx, render_size, y_weight);
 		
 		float neg_y_weight;
 
-		vec4 neg_y_sample = sample_y_velocity(x, neg_t, vn, vn_length, wvn, zx, render_size, neg_y_weight);
+		vec4 neg_y_sample = sample_y_velocity(x, neg_t, vn, vn_length, wvn, zx, vzx, render_size, neg_y_weight);
 
 		blend_blur(base_color, x_sample, x_weight, neg_x_sample, neg_x_weight, y_sample, y_weight, sum, color_weight, alpha_weight);
 

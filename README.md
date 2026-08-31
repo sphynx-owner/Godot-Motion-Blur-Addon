@@ -105,10 +105,10 @@ When designed to naturally complete each other, combining the two processes resu
 
 Godot provides us with a motion-vectors texture, and it's not without its caveats:
 
+- Motion vectors are actually not motion vectors. They are the UV space change of each pixel from the last frame, they point to the previous UV of the object. To actually use them as velocities, we have to negate them.
 - The user has no control over them, so they cannot be selectively disabled or enabled for individual meshes (custom motion vector support is in the works).
 - Motion vectors are not written for background and skyboxes
 - Some render settings like enabling FSR2 modify how these motion vectors behave.
-- Motion vectors are in UV space and when negated just point to the previous UV of the object.
 - As of now there are glitches with objects that are spawned in, and sharp direction changes of the camera movement.
 - If the camera moves backwards really fast along a surface, you can see velocity vectors that point to a position behind the camera's near clip plane. This leads to these velocities being flipped, and in addition results in asymptotical behavior the closer these previos positions are to the near clip plane.
 
@@ -150,7 +150,7 @@ You can see this behavior in the example of [a previous section](#real-time-post
 
 Engines like Unreal Engine provide tangential velocities in its velcoity texture, derived from the object's linear and angular velocity values. They work well with centered blur, as tangent velocities estimate the object's actual trajectory equally well both forwards and backwards.
 
-However, Godot's velocity texture is actually just a negated UV-change texture. So the negated value of each pixel points to it's past screen UV.
+However, Godot's velocity texture is actually just a UV-change texture. So the value of each pixel points to it's past screen UV.
 
 This means that the "most correct' blurring in godot would happen *backwards* in time, bridging the object to its past position.
 
