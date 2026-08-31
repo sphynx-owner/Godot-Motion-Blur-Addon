@@ -55,11 +55,11 @@ const COLOR_OUTPUT_TEXTURE : StringName = "color_output"
 
 @export_group("multipliers", "multiplier_")
 
-@export var multiplier_camera_rotation := 1.0
+@export_range(0, 1, 0.001) var multiplier_camera_rotation := 1.0
 
-@export var multiplier_camera_movement := 1.0
+@export_range(0, 1, 0.001) var multiplier_camera_movement := 1.0
 
-@export var multiplier_object_movement := 1.0
+@export_range(0, 1, 0.001) var multiplier_object_movement := 1.0
 
 @export_group("velocity thresholds", "velocity_threshold_")
 

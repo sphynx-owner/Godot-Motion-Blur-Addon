@@ -10,9 +10,6 @@
 #define DEPTH_DIFF_INTOLERANCE 2
 #define DEPTH_DIFF_LOW_INTOLERANCE 0.1
 
-// NOTE @sphynx-owner: the velocity texture sampler must have the filtering set to nearest.
-#define sample_velocity(velocity_texture, uv) textureLod(velocity_texture, uv, 0.0)
-
 #define USE_JITTER
 
 #ifdef USE_JITTER
@@ -80,12 +77,18 @@ ivec2 jitter_tile(ivec2 uvi) {
 }
 // ----------------------------------------------------------
 
-vec4 sample_x_velocity(vec2 x, float t, vec2 vx, float vx_length, vec2 wvx, float zx, float vzx, ivec2 render_size, out float x_weight) {
+vec4 sample_x_velocity(ivec2 x, float t, vec2 vx, float vx_length, vec2 wvx, float zx, float vzx, ivec2 render_size, out float x_weight) {
 	// TODO @sphynx-owner: do we need to divide by render
 	// size?
-	vec2 yx = x + t * vx / vec2(render_size);
+	ivec2 yx = x + ivec2(t * vx);
 
-	vec4 syx = sample_velocity(velocity_sampler, yx);
+	if (yx.x < 0 || yx.x > render_size.x || yx.y < 0 || yx.y > render_size.y) {
+		x_weight = 0;
+
+		return vec4(0);
+	}
+
+	vec4 syx = texelFetch(velocity_sampler, yx, 0);
 
 	vec2 vyx = syx.xy;
 
@@ -109,15 +112,22 @@ vec4 sample_x_velocity(vec2 x, float t, vec2 vx, float vx_length, vec2 wvx, floa
 
 	x_weight = max(clamp(reaches_weight, 0, 1) * soft_overlap_x, overlap_x);
 
-	return textureLod(color_sampler, yx, 0.0);
+	return texelFetch(color_sampler, yx, 0);
 }
 
-vec4 sample_y_velocity(vec2 x, float t, vec2 vn, float vn_length, vec2 wvn, float zx, float vzx, ivec2 render_size, out float y_weight) {
+vec4 sample_y_velocity(ivec2 x, float t, vec2 vn, float vn_length, vec2 wvn, float zx, float vzx, ivec2 render_size, out float y_weight) {
 	// The sample positon along the neighbor_max velocity.
-	vec2 yn = x + t * vn / vec2(render_size);
+	ivec2 yn = x + ivec2(t * vn);
+	
+	// If the found velocity is smaller than a pixel's radius, exit early.
+	if (yn.x < 0 || yn.x > render_size.x || yn.y < 0 || yn.y > render_size.y) {
+		y_weight = 0;
+
+		return vec4(0);
+	}
 
 	// We get the velocity at the sample position.
-	vec4 syn = sample_velocity(velocity_sampler, yn);
+	vec4 syn = texelFetch(velocity_sampler, yn, 0);
 
 	// The velocity at the sample position.
 	vec2 vyn = syn.xy;
@@ -135,8 +145,7 @@ vec4 sample_y_velocity(vec2 x, float t, vec2 vn, float vn_length, vec2 wvn, floa
 	float overlapn = soft_compare(zyn - vzyn * t, zx + vzx * t, DEPTH_DIFF_INTOLERANCE);
 	
 	// If the found velocity is smaller than a pixel's radius, exit early.
-	if (vyn_length < PIXEL_RADIUS || overlapn <= EPSILON)
-	{
+	if (vyn_length < PIXEL_RADIUS || overlapn <= EPSILON) {
 		y_weight = 0;
 
 		return vec4(0);
@@ -162,7 +171,7 @@ vec4 sample_y_velocity(vec2 x, float t, vec2 vn, float vn_length, vec2 wvn, floa
 	// to counteract the resulting opacity dilution.
 	y_weight = step(tn, vyn_length / 2.0 * projected) * overlapn * pow(vn_length / vyn_length, 0.5);
 
-	return textureLod(color_sampler, yn, 0.0);
+	return texelFetch(color_sampler, yn, 0);
 }
 
 void blend_blur(
@@ -211,7 +220,7 @@ void main() {
 	// We convert the pixel position into a texturing sampling position
 	// we add 0.5 to offset the sampling to be in the "middle" of the pixel
 	// and avoid artifacts caused by bilinear interpolation.
-	vec2 x = (vec2(uvi) + vec2(0.5)) / vec2(render_size);
+	ivec2 x = uvi;
 
 	ivec2 neighbor_max_uvi = (uvi + TILE_JITTER) / params.tile_size;
 
@@ -223,11 +232,11 @@ void main() {
 	vec2 vn = texelFetch(neighbor_max, neighbor_max_uvi, 0).xy;
 
 	// We get the true velocity at the current pixel
-	vec4 sx = sample_velocity(velocity_sampler, x);
+	vec4 sx = texelFetch(velocity_sampler, x, 0);
 
 	vec2 vx = sx.xy;
 
-	vec4 base_color = textureLod(color_sampler, x, 0.0);
+	vec4 base_color = texelFetch(color_sampler, x, 0);
 
 	// We must account for cases where the dominant velocity is 0 even though
 	// The current velocity is not. This is only the case for the skybox, which
