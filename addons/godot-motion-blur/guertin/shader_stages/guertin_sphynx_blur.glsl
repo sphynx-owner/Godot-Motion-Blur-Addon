@@ -7,8 +7,8 @@
 #define EPSILON 1e-6
 #define PIXEL_RADIUS 0.5
 #define PIXEL_RADIUS_SQUARED 0.25
-#define DEPTH_DIFF_TOLERANCE 2
-#define DEPTH_DIFF_LOW_TOLERANCE 0.1
+#define DEPTH_DIFF_INTOLERANCE 2
+#define DEPTH_DIFF_LOW_INTOLERANCE 0.1
 
 // NOTE @sphynx-owner: the velocity texture sampler must have the filtering set to nearest.
 #define sample_velocity(velocity_texture, uv) textureLod(velocity_texture, uv, 0.0)
@@ -103,11 +103,11 @@ vec4 sample_x_velocity(vec2 x, float t, vec2 vx, float vx_length, vec2 wvx, floa
 
 	float vzyx = syx.z;
 
-	float overlap_x = soft_compare(zx + vzx * t, zyx + vzyx * t, DEPTH_DIFF_TOLERANCE);
+	float overlap_x = soft_compare(zx + vzx * t, zyx + vzyx * t, DEPTH_DIFF_INTOLERANCE);
 
-	float soft_overlap_x = 1 - soft_compare(zyx + vzyx * t, zx + vzx * t, DEPTH_DIFF_LOW_TOLERANCE);
+	float soft_overlap_x = 1 - soft_compare(zyx + vzyx * t, zx + vzx * t, DEPTH_DIFF_LOW_INTOLERANCE);
 
-	x_weight = max(clamp(reaches_weight, 0, 1) * soft_overlap_x, overlap_x);//overlap_x;//
+	x_weight = max(clamp(reaches_weight, 0, 1) * soft_overlap_x, overlap_x);
 
 	return textureLod(color_sampler, yx, 0.0);
 }
@@ -132,7 +132,7 @@ vec4 sample_y_velocity(vec2 x, float t, vec2 vn, float vn_length, vec2 wvn, floa
 
 	// We get whether the depth at the sample position plus offset derived from the z velocity is in front
 	// of the depth at the current pixel. Starts at 0 when same depth, and goes to 1 the closer it is.
-	float overlapn = soft_compare(zyn - vzyn * t, zx + vzx * t, DEPTH_DIFF_TOLERANCE);
+	float overlapn = soft_compare(zyn - vzyn * t, zx + vzx * t, DEPTH_DIFF_INTOLERANCE);
 	
 	// If the found velocity is smaller than a pixel's radius, exit early.
 	if (vyn_length < PIXEL_RADIUS || overlapn <= EPSILON)

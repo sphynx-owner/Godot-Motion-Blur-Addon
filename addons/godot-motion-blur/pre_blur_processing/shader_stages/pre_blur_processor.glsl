@@ -260,18 +260,6 @@ void main() {
 	}
 	// ---------------------------------------------------
 
-	// Here is where the intensity parameter is applied, customized by the user.
-	total_velocity *= params.motion_blur_intensity;
-	
-	// Here is where we apply the velocity thresholds, customized by the user.
-	total_velocity *= sharp_step(
-		params.velocity_lower_threshold,
-		params.velocity_upper_threshold,
-		length(total_velocity.xy)
-	);
-
-	// From this point on we process the velocities for stability and robustness.
-
 	// When the past ndc is behind the camera's near plane (or origin, not sure), the velocities asymptotally scale to infinity.
 	// This is a natural, undesirable behavior that occurs when the camera moves backwards rapidly. We tame these values by
 	// clamping their length to 1.
@@ -291,6 +279,16 @@ void main() {
 
 	clamp_length(total_velocity, total_velocity.xy, clamp_size);
 	// ---------------------------------------------------
+
+	// Here is where the intensity parameter is applied, customized by the user.
+	total_velocity *= params.motion_blur_intensity;
+	
+	// Here is where we apply the velocity thresholds, customized by the user.
+	total_velocity *= sharp_step(
+		params.velocity_lower_threshold,
+		params.velocity_upper_threshold,
+		length(total_velocity.xy)
+	);
 
 	// If depth == 0 (skybox), view_position.z is -inf, which can also be arithmetically achieved with (-1.0 / 0.0).
 	// total_velocity up to this point was backwards, because it was derived using UV differences, which were vectors
