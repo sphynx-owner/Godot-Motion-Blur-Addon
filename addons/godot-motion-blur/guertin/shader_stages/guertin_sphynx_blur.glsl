@@ -189,7 +189,7 @@ vec4 sample_y_velocity(ivec2 x, float t, vec2 vn, float vn_length, vec2 wvn, flo
 	// 2. Is the depth at the found pixel, including its depth velocity, overlap the current one
 	// 3. An additional offset that handles when the neighbor_max velocity is larger than the found velocity
 	// to counteract the resulting opacity dilution.
-	y_weight = step(tn, vyn_length / 2.0 * projected) * overlapn * pow(vn_length / vyn_length, 0.5);
+	y_weight = step(tn, vyn_length / 2.0 * projected) * overlapn * max(1.05, pow(vn_length / vyn_length, 0.5));
 
 	return texelFetch(color_sampler, yn, 0);
 }
