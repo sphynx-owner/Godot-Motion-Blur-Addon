@@ -35,6 +35,10 @@ layout(rgba16f, set = 0, binding = 3) uniform writeonly image2D output_color;
 
 layout(push_constant, std430) uniform Params 
 {	
+	float t_test;
+	float nan1;
+	float nan2;
+	float nan3;
 	int tile_size;
 	int sample_count;
 	int frame;
@@ -115,13 +119,13 @@ vec4 sample_x_velocity(ivec2 x, float t, vec2 vx, float vx_length, vec2 wvx, flo
 
 	float x_depth = zx + vzx * Z_VELOCITY_MULTIPLIER * t;
 
-	float yx_depth = zyx + vzyx * Z_VELOCITY_MULTIPLIER * t;
+	float yx_depth = zyx;// + vzyx * Z_VELOCITY_MULTIPLIER * t;
 
-	float soft_overlap_x = cone(x_depth, yx_depth, SOFT_DEPTH_SENSITIVITY / (1 + zx));
+	float soft_overlap_x = cone(x_depth, yx_depth, SOFT_DEPTH_SENSITIVITY);
 
 	x_weight = soft_overlap_x * reaches_weight;
 
-	float overlap_x = soft_compare(x_depth, yx_depth, SOFT_DEPTH_SENSITIVITY / (1 + zx));
+	float overlap_x = soft_compare(x_depth, yx_depth, SOFT_DEPTH_SENSITIVITY);
 
 	x_back_weight = overlap_x;
 	
@@ -153,7 +157,7 @@ vec4 sample_y_velocity(ivec2 x, float t, vec2 vn, float vn_length, vec2 wvn, flo
 	// The z velocity at the sample position.
 	float vzyn = syn.z;
 
-	float x_depth = zx + vzx * Z_VELOCITY_MULTIPLIER * t;
+	float x_depth = zx;// + vzx * Z_VELOCITY_MULTIPLIER * t;
 
 	// TODO @sphynx-owner: understand why we use the negative of the depth
 	// velocity here and not in the sample_x_velocity function.
@@ -161,7 +165,7 @@ vec4 sample_y_velocity(ivec2 x, float t, vec2 vn, float vn_length, vec2 wvn, flo
 
 	// We get whether the depth at the sample position plus offset derived from the z velocity is in front
 	// of the depth at the current pixel. Starts at 0 when same depth, and goes to 1 the closer it is.
-	float overlapn = soft_compare(y_depth, x_depth, SOFT_DEPTH_SENSITIVITY / (1 + zx));
+	float overlapn = soft_compare(y_depth, x_depth, SOFT_DEPTH_SENSITIVITY);
 	
 	// If the found velocity is smaller than a pixel's radius, exit early.
 	if (vyn_length < PIXEL_RADIUS || overlapn <= EPSILON) {
@@ -259,11 +263,29 @@ void main() {
 	vec4 base_color = texelFetch(color_sampler, x, 0);
 
 #ifdef DEBUG
+	float t = params.t_test;
+
 	float x_depth = sx.w;
 
-	float x_;
+	float x_z_velocity = sx.z;
 
-	imageStore(debug_12_image, uvi, vec4(1));
+	float x_final_depth = x_depth + x_z_velocity * t;
+
+	vec2 uvx = (vec2(uvi) + 0.5) / vec2(render_size);
+
+	vec2 uvy = uvx + (vec2(vx) / vec2(render_size)) * t;
+
+	vec4 sy = textureLod(velocity_sampler, uvy, 0.0);
+
+	float y_depth = sy.w;
+
+	float y_z_velocity = sy.z;
+
+	float y_final_depth = y_depth;
+
+	float result = cone(x_final_depth, y_final_depth, SOFT_DEPTH_SENSITIVITY);
+
+	imageStore(debug_12_image, uvi, vec4(result));
 #endif
 
 	// We must account for cases where the dominant velocity is 0 even though
