@@ -5,11 +5,12 @@
 #define FLT_MIN 1.175494351e-38
 #define M_PI 3.1415926535897932384626433832795
 #define EPSILON 1e-6
+#define SMALL_EPSILON 1e-9
 #define PIXEL_RADIUS 0.5
 #define PIXEL_RADIUS_SQUARED 0.25
 // At depth difference of 1 / SOFT_DEPTH_SENSITIVITY the velocity weights are
 // at their extremes.
-#define SOFT_DEPTH_SENSITIVITY 10000
+#define SOFT_DEPTH_SENSITIVITY 10
 
 #define Z_VELOCITY_MULTIPLIER 1
 
@@ -34,11 +35,7 @@ layout(rgba16f, set = 0, binding = 3) uniform writeonly image2D output_color;
 // DEBUG_UNIFORMS
 
 layout(push_constant, std430) uniform Params 
-{	
-	float t_test;
-	float nan1;
-	float nan2;
-	float nan3;
+{
 	int tile_size;
 	int sample_count;
 	int frame;
@@ -88,7 +85,7 @@ ivec2 jitter_tile(ivec2 uvi) {
 }
 // ----------------------------------------------------------
 
-vec4 sample_x_velocity(ivec2 x, float t, vec2 vx, float vx_length, vec2 wvx, float zx, float vzx, ivec2 render_size, out float x_weight, out float x_back_weight) {
+vec4 sample_x_velocity(ivec2 x, float t, vec2 vx, float vx_length, vec2 wvx, float zx, float vzx, float soft_depth_sensitivity, ivec2 render_size, out float x_weight, out float x_back_weight) {
 	// TODO @sphynx-owner: do we need to divide by render
 	// size?
 	ivec2 yx = x + ivec2(t * vx);
@@ -119,20 +116,20 @@ vec4 sample_x_velocity(ivec2 x, float t, vec2 vx, float vx_length, vec2 wvx, flo
 
 	float x_depth = zx + vzx * Z_VELOCITY_MULTIPLIER * t;
 
-	float yx_depth = zyx;// + vzyx * Z_VELOCITY_MULTIPLIER * t;
+	float yx_depth = zyx;
 
-	float soft_overlap_x = cone(x_depth, yx_depth, SOFT_DEPTH_SENSITIVITY);
+	float soft_overlap_x = cone(x_depth, yx_depth, soft_depth_sensitivity);
 
 	x_weight = soft_overlap_x * reaches_weight;
 
-	float overlap_x = soft_compare(x_depth, yx_depth, SOFT_DEPTH_SENSITIVITY);
+	float overlap_x = soft_compare(x_depth, yx_depth, soft_depth_sensitivity);
 
 	x_back_weight = overlap_x;
 	
 	return texelFetch(color_sampler, yx, 0);
 }
 
-vec4 sample_y_velocity(ivec2 x, float t, vec2 vn, float vn_length, vec2 wvn, float zx, float vzx, ivec2 render_size, out float y_weight) {
+vec4 sample_y_velocity(ivec2 x, float t, vec2 vn, float vn_length, vec2 wvn, float zx, float vzx, float soft_depth_sensitivity, ivec2 render_size, out float y_weight) {
 	// The sample positon along the neighbor_max velocity.
 	ivec2 yn = x + ivec2(t * vn);
 	
@@ -157,7 +154,7 @@ vec4 sample_y_velocity(ivec2 x, float t, vec2 vn, float vn_length, vec2 wvn, flo
 	// The z velocity at the sample position.
 	float vzyn = syn.z;
 
-	float x_depth = zx;// + vzx * Z_VELOCITY_MULTIPLIER * t;
+	float x_depth = zx;
 
 	// TODO @sphynx-owner: understand why we use the negative of the depth
 	// velocity here and not in the sample_x_velocity function.
@@ -165,7 +162,7 @@ vec4 sample_y_velocity(ivec2 x, float t, vec2 vn, float vn_length, vec2 wvn, flo
 
 	// We get whether the depth at the sample position plus offset derived from the z velocity is in front
 	// of the depth at the current pixel. Starts at 0 when same depth, and goes to 1 the closer it is.
-	float overlapn = soft_compare(y_depth, x_depth, SOFT_DEPTH_SENSITIVITY);
+	float overlapn = soft_compare(y_depth, x_depth, soft_depth_sensitivity);
 	
 	// If the found velocity is smaller than a pixel's radius, exit early.
 	if (vyn_length < PIXEL_RADIUS || overlapn <= EPSILON) {
@@ -263,7 +260,7 @@ void main() {
 	vec4 base_color = texelFetch(color_sampler, x, 0);
 
 #ifdef DEBUG
-	float t = params.t_test;
+	float t = 1;
 
 	float x_depth = sx.w;
 
@@ -320,6 +317,8 @@ void main() {
 	// Get the depth velocity at current pixel
 	float vzx = sx.z;
 
+	float soft_depth_sensitivity = SOFT_DEPTH_SENSITIVITY / max(SMALL_EPSILON, zx);
+
 	// We get some random value for the current pixel between 0 and 1. This will be used to
 	// jitter the blur sampling, and achieve smoother looking blur gradient
 	// with a fraction of the sample count.
@@ -347,21 +346,21 @@ void main() {
 
 		float x_back_weight;
 		
-		vec4 x_sample = sample_x_velocity(x, t, vx, vx_length, wvx, zx, vzx, render_size, x_weight, x_back_weight);
+		vec4 x_sample = sample_x_velocity(x, t, vx, vx_length, wvx, zx, vzx, soft_depth_sensitivity, render_size, x_weight, x_back_weight);
 		
 		float neg_x_weight;
 
 		float neg_x_back_weight;
 
-		vec4 neg_x_sample = sample_x_velocity(x, neg_t, vx, vx_length, wvx, zx, vzx, render_size, neg_x_weight, neg_x_back_weight);
+		vec4 neg_x_sample = sample_x_velocity(x, neg_t, vx, vx_length, wvx, zx, vzx, soft_depth_sensitivity, render_size, neg_x_weight, neg_x_back_weight);
 
 		float y_weight;
 
-		vec4 y_sample = sample_y_velocity(x, t, vn, vn_length, wvn, zx, vzx, render_size, y_weight);
+		vec4 y_sample = sample_y_velocity(x, t, vn, vn_length, wvn, zx, vzx, soft_depth_sensitivity, render_size, y_weight);
 		
 		float neg_y_weight;
 
-		vec4 neg_y_sample = sample_y_velocity(x, neg_t, vn, vn_length, wvn, zx, vzx, render_size, neg_y_weight);
+		vec4 neg_y_sample = sample_y_velocity(x, neg_t, vn, vn_length, wvn, zx, vzx, soft_depth_sensitivity, render_size, neg_y_weight);
 
 		blend_blur(base_color, x_sample, x_weight, x_back_weight, neg_x_sample, neg_x_weight, y_sample, y_weight, sum, color_weight, alpha_weight);
 

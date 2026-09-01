@@ -151,6 +151,8 @@ void main() {
 	mat4 prev_view_matrix = view_mat3x4_to_mat4(previous_scene_data.view_matrix);
 
 	vec4 view_past_position = prev_view_matrix * vec4(world_position.xyz, 1.0);
+
+	vec3 current_uv = vec3(uvn, depth);
 	// ---------------------------------------------------
 
 	// We extract a UV change (and an additional, view-space depth change component)
@@ -163,7 +165,7 @@ void main() {
 
 	vec4 view_past_ndc_cache = view_past_ndc;
 
-	vec3 camera_uv_change = past_uv - vec3(uvn, depth);
+	vec3 camera_uv_change = past_uv - current_uv;
 	// ---------------------------------------------------
 
 	// We do a similar process, but this time only using the rotation part of the view matrices,
@@ -179,7 +181,7 @@ void main() {
 
 	past_uv = vec3(ndc_to_uv(view_past_ndc.xy), view_past_ndc.z);
 
-	vec3 camera_rotation_uv_change = past_uv - vec3(uvn, depth);
+	vec3 camera_rotation_uv_change = past_uv - current_uv;
 	// ---------------------------------------------------
 
 	// By subtracting the rotation part of the UV change from the total UV change, we can arrive

@@ -18,8 +18,6 @@ const NEIGHBOR_MAX_TEXTURE : StringName = &"neighbor_max"
 
 var _previous_time : float = 0
 
-@export_range(-1, 1, 0.001) var test_time: float = 1
-
 
 func _enhanced_render_callback(render_size : Vector2i):
 	var time : float = float(Time.get_ticks_msec()) / 1000.0
@@ -80,9 +78,7 @@ func _enhanced_render_callback(render_size : Vector2i):
 	var neighbor_max_push_constants: PackedByteArray = get_push_constants([], [], true)
 	
 	var blur_push_constants: PackedByteArray = get_push_constants(
-		[
-			test_time,
-		],
+		[],
 		[
 			tile_size,
 			samples,
