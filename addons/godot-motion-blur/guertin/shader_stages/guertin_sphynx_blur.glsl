@@ -7,8 +7,9 @@
 #define EPSILON 1e-6
 #define PIXEL_RADIUS 0.5
 #define PIXEL_RADIUS_SQUARED 0.25
-#define SOFT_DEPTH_EXTENT 1
-#define SOFT_DEPTH_VELOCITY_MULTIPLIER 0
+// At depth difference of 1 / SOFT_DEPTH_SENSITIVITY the velocity weights are
+// at their extremes.
+#define SOFT_DEPTH_SENSITIVITY 1
 
 #define USE_JITTER
 
@@ -39,8 +40,6 @@ layout(push_constant, std430) uniform Params
 } params;
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
-
-#define get_soft_depth_extent(velocity) SOFT_DEPTH_EXTENT / (1 + (velocity * SOFT_DEPTH_VELOCITY_MULTIPLIER));
 
 // Guertin's functions https://research.nvidia.com/sites/default/files/pubs/2013-11_A-Fast-and/Guertin2013MotionBlur-small.pdf
 // ----------------------------------------------------------
@@ -116,13 +115,13 @@ vec4 sample_x_velocity(ivec2 x, float t, vec2 vx, float vx_length, vec2 wvx, flo
 
 	float yx_depth = zyx + vzyx * t;
 
-	float soft_depth_extent = get_soft_depth_extent(vzyx);
+	float soft_overlap_x = cone(x_depth, yx_depth, SOFT_DEPTH_SENSITIVITY);
 
-	float overlap_x = soft_compare(x_depth, yx_depth, soft_depth_extent);
+	x_weight = soft_overlap_x * reaches_weight;
 
-	float soft_overlap_x = cone(x_depth, yx_depth, soft_depth_extent);
+	float overlap_x = soft_compare(x_depth, yx_depth, SOFT_DEPTH_SENSITIVITY);
 
-	x_weight = clamp(soft_overlap_x + overlap_x, 0, 1);
+	x_back_weight = overlap_x;
 	
 	return texelFetch(color_sampler, yx, 0);
 }
@@ -158,11 +157,9 @@ vec4 sample_y_velocity(ivec2 x, float t, vec2 vn, float vn_length, vec2 wvn, flo
 	// velocity here and not in the sample_x_velocity function.
 	float y_depth = zyn - vzyn * t;
 
-	float soft_depth_extent = get_soft_depth_extent(vzyn);
-
 	// We get whether the depth at the sample position plus offset derived from the z velocity is in front
 	// of the depth at the current pixel. Starts at 0 when same depth, and goes to 1 the closer it is.
-	float overlapn = soft_compare(y_depth, x_depth, soft_depth_extent);
+	float overlapn = soft_compare(y_depth, x_depth, SOFT_DEPTH_SENSITIVITY);
 	
 	// If the found velocity is smaller than a pixel's radius, exit early.
 	if (vyn_length < PIXEL_RADIUS || overlapn <= EPSILON) {
@@ -214,7 +211,7 @@ void blend_blur(
 	// this needs to be thoroughly tested.
 	vec4 x_color_sample = mix(neg_x_sample, x_sample, clamp(x_weight / neg_x_weight, 0, 1));
 
-	vec4 current_color = mix(mix(base_color, x_color_sample, current_weight_x), y_sample, y_weight);
+	vec4 current_color = mix(mix(mix(base_color, x_color_sample, current_weight_x), x_sample, x_back_weight), y_sample, y_weight);
 
 	float current_color_weight = max(current_color.a, 1 - params.transparent_bg);
 
