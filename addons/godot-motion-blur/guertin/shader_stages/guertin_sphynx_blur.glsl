@@ -7,8 +7,8 @@
 #define EPSILON 1e-6
 #define PIXEL_RADIUS 0.5
 #define PIXEL_RADIUS_SQUARED 0.25
-#define DEPTH_DIFF_INTOLERANCE 2
-#define DEPTH_DIFF_LOW_INTOLERANCE 0.1
+#define SOFT_DEPTH_EXTENT 1
+#define SOFT_DEPTH_VELOCITY_MULTIPLIER 0
 
 #define USE_JITTER
 
@@ -40,10 +40,16 @@ layout(push_constant, std430) uniform Params
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
+#define get_soft_depth_extent(velocity) SOFT_DEPTH_EXTENT / (1 + (velocity * SOFT_DEPTH_VELOCITY_MULTIPLIER));
+
 // Guertin's functions https://research.nvidia.com/sites/default/files/pubs/2013-11_A-Fast-and/Guertin2013MotionBlur-small.pdf
 // ----------------------------------------------------------
 float soft_compare(float a, float b, float sze) {
 	return clamp(sze * (a - b), 0, 1);
+}
+
+float cone(float a, float b, float sze) {
+	return clamp(1 - sze * abs(a - b), 0, 1);
 }
 // ----------------------------------------------------------
 
@@ -77,7 +83,7 @@ ivec2 jitter_tile(ivec2 uvi) {
 }
 // ----------------------------------------------------------
 
-vec4 sample_x_velocity(ivec2 x, float t, vec2 vx, float vx_length, vec2 wvx, float zx, float vzx, ivec2 render_size, out float x_weight) {
+vec4 sample_x_velocity(ivec2 x, float t, vec2 vx, float vx_length, vec2 wvx, float zx, float vzx, ivec2 render_size, out float x_weight, out float x_back_weight) {
 	// TODO @sphynx-owner: do we need to divide by render
 	// size?
 	ivec2 yx = x + ivec2(t * vx);
@@ -106,12 +112,18 @@ vec4 sample_x_velocity(ivec2 x, float t, vec2 vx, float vx_length, vec2 wvx, flo
 
 	float vzyx = syx.z;
 
-	float overlap_x = soft_compare(zx + vzx * t, zyx + vzyx * t, DEPTH_DIFF_INTOLERANCE);
+	float x_depth = zx + vzx * t;
 
-	float soft_overlap_x = 1 - soft_compare(zyx + vzyx * t, zx + vzx * t, DEPTH_DIFF_LOW_INTOLERANCE);
+	float yx_depth = zyx + vzyx * t;
 
-	x_weight = max(clamp(reaches_weight, 0, 1) * soft_overlap_x, overlap_x);
+	float soft_depth_extent = get_soft_depth_extent(vzyx);
 
+	float overlap_x = soft_compare(x_depth, yx_depth, soft_depth_extent);
+
+	float soft_overlap_x = cone(x_depth, yx_depth, soft_depth_extent);
+
+	x_weight = clamp(soft_overlap_x + overlap_x, 0, 1);
+	
 	return texelFetch(color_sampler, yx, 0);
 }
 
@@ -140,9 +152,17 @@ vec4 sample_y_velocity(ivec2 x, float t, vec2 vn, float vn_length, vec2 wvn, flo
 	// The z velocity at the sample position.
 	float vzyn = syn.z;
 
+	float x_depth = zx + vzx * t;
+
+	// TODO @sphynx-owner: understand why we use the negative of the depth
+	// velocity here and not in the sample_x_velocity function.
+	float y_depth = zyn - vzyn * t;
+
+	float soft_depth_extent = get_soft_depth_extent(vzyn);
+
 	// We get whether the depth at the sample position plus offset derived from the z velocity is in front
 	// of the depth at the current pixel. Starts at 0 when same depth, and goes to 1 the closer it is.
-	float overlapn = soft_compare(zyn - vzyn * t, zx + vzx * t, DEPTH_DIFF_INTOLERANCE);
+	float overlapn = soft_compare(y_depth, x_depth, soft_depth_extent);
 	
 	// If the found velocity is smaller than a pixel's radius, exit early.
 	if (vyn_length < PIXEL_RADIUS || overlapn <= EPSILON) {
@@ -178,6 +198,7 @@ void blend_blur(
 	vec4 base_color,
 	vec4 x_sample,
 	float x_weight,
+	float x_back_weight,
 	vec4 neg_x_sample,
 	float neg_x_weight,
 	vec4 y_sample,
@@ -294,12 +315,16 @@ void main() {
 		float neg_t = mix(0, 0.5, neg_ti);
 
 		float x_weight;
+
+		float x_back_weight;
 		
-		vec4 x_sample = sample_x_velocity(x, t, vx, vx_length, wvx, zx, vzx, render_size, x_weight);
+		vec4 x_sample = sample_x_velocity(x, t, vx, vx_length, wvx, zx, vzx, render_size, x_weight, x_back_weight);
 		
 		float neg_x_weight;
 
-		vec4 neg_x_sample = sample_x_velocity(x, neg_t, vx, vx_length, wvx, zx, vzx, render_size, neg_x_weight);
+		float neg_x_back_weight;
+
+		vec4 neg_x_sample = sample_x_velocity(x, neg_t, vx, vx_length, wvx, zx, vzx, render_size, neg_x_weight, neg_x_back_weight);
 
 		float y_weight;
 
@@ -309,9 +334,9 @@ void main() {
 
 		vec4 neg_y_sample = sample_y_velocity(x, neg_t, vn, vn_length, wvn, zx, vzx, render_size, neg_y_weight);
 
-		blend_blur(base_color, x_sample, x_weight, neg_x_sample, neg_x_weight, y_sample, y_weight, sum, color_weight, alpha_weight);
+		blend_blur(base_color, x_sample, x_weight, x_back_weight, neg_x_sample, neg_x_weight, y_sample, y_weight, sum, color_weight, alpha_weight);
 
-		blend_blur(base_color, neg_x_sample, neg_x_weight, x_sample, x_weight, neg_y_sample, neg_y_weight, sum, color_weight, alpha_weight);
+		blend_blur(base_color, neg_x_sample, neg_x_weight, neg_x_back_weight, x_sample, x_weight, neg_y_sample, neg_y_weight, sum, color_weight, alpha_weight);
 	}
 
 	sum.rgb /= color_weight;

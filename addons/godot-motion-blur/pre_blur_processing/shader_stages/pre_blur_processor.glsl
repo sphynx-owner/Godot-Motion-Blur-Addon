@@ -260,12 +260,7 @@ void main() {
 	}
 	// ---------------------------------------------------
 
-	// When the past ndc is behind the camera's near plane (or origin, not sure), the velocities asymptotally scale to infinity.
-	// This is a natural, undesirable behavior that occurs when the camera moves backwards rapidly. We tame these values by
-	// clamping their length to 1.
-	clamp_length(total_velocity, total_velocity.xy, 1.0);
-
-	// If the previous position is happening behind the camera, which can happen when the camera moves backwards at high speed,
+	// If the previous position is happening behind the camera's near clip plane, which can happen when the camera moves backwards at high speed,
 	// the w component of the projected vector would be negative, and the velocity vector would be flipped.
 	// This happens with Godot's native motion vectors as well. We can detect this and flip them back, avoiding
 	// crazy artifacts.
@@ -300,7 +295,7 @@ void main() {
 #ifdef DEBUG
 	imageStore(debug_2_image, uvi, vec4(pow(texelFetch(depth_sampler, uvi, 0).x, 0.5)));
 	imageStore(debug_3_image, uvi, vec4(-sampled_velocity, 0.0, 0.0));
-	imageStore(debug_4_image, uvi, vec4(vec2(uvi) / vec2(render_size), final_output.z , 1.0));
+	imageStore(debug_4_image, uvi, vec4(0, 0, abs(abs(final_output.z / 3) - 1), 1.0));
 	imageStore(debug_9_image, uvi, vec4(-(final_output.w) / 100.0));
 	imageStore(debug_10_image, uvi, vec4(-(final_output.w - final_output.z) / 100.0));
 	imageStore(debug_12_image, uvi, vec4(abs(final_output.z * view_position.w) / 100.0));
