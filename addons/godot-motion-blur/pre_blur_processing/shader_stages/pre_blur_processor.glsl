@@ -6,7 +6,7 @@
 #define PIXEL_RADIUS_SQUARED 0.25
 
 // Arrived at via experimentation
-#define OBJECT_UV_CHANGE_EPSILON 0.0005
+#define OBJECT_UV_CHANGE_EPSILON 0.00001
 
 layout(set = 0, binding = 0) uniform sampler2D depth_sampler;
 layout(set = 0, binding = 1) uniform sampler2D vector_sampler;
@@ -159,11 +159,11 @@ void main() {
 
 	view_past_ndc.xyz /= view_past_ndc.w;
 
-	vec3 past_uv = vec3(ndc_to_uv(view_past_ndc.xy), view_past_position.z);
+	vec3 past_uv = vec3(ndc_to_uv(view_past_ndc.xy), view_past_ndc.z);
 
 	vec4 view_past_ndc_cache = view_past_ndc;
 
-	vec3 camera_uv_change = past_uv - vec3(uvn, view_position.z);
+	vec3 camera_uv_change = past_uv - vec3(uvn, depth);
 	// ---------------------------------------------------
 
 	// We do a similar process, but this time only using the rotation part of the view matrices,
@@ -177,9 +177,9 @@ void main() {
 
 	view_past_ndc.xyz /= view_past_ndc.w;
 
-	past_uv = vec3(ndc_to_uv(view_past_ndc.xy), view_past_position.z);
+	past_uv = vec3(ndc_to_uv(view_past_ndc.xy), view_past_ndc.z);
 
-	vec3 camera_rotation_uv_change = past_uv - vec3(uvn, view_position.z);
+	vec3 camera_rotation_uv_change = past_uv - vec3(uvn, depth);
 	// ---------------------------------------------------
 
 	// By subtracting the rotation part of the UV change from the total UV change, we can arrive
@@ -288,16 +288,13 @@ void main() {
 	// If depth == 0 (skybox), view_position.z is -inf, which can also be arithmetically achieved with (-1.0 / 0.0).
 	// total_velocity up to this point was backwards, because it was derived using UV differences, which were vectors
 	// pointing to the previous UV, meaning the velocity of the pixel is in the other direction.
-	vec4 final_output = vec4(-total_velocity, view_position.z);
+	vec4 final_output = vec4(-total_velocity, depth);
 
 	imageStore(vector_output, uvi, final_output);
 
 #ifdef DEBUG
-	imageStore(debug_2_image, uvi, vec4(pow(texelFetch(depth_sampler, uvi, 0).x, 0.5)));
+	imageStore(debug_2_image, uvi, vec4(texelFetch(depth_sampler, uvi, 0).x * 5));
 	imageStore(debug_3_image, uvi, vec4(-sampled_velocity, 0.0, 0.0));
-	imageStore(debug_4_image, uvi, vec4(0, 0, abs(abs(final_output.z / 3) - 1), 1.0));
-	imageStore(debug_9_image, uvi, vec4(-(final_output.w) / 100.0));
-	imageStore(debug_10_image, uvi, vec4(-(final_output.w - final_output.z) / 100.0));
-	imageStore(debug_12_image, uvi, vec4(abs(final_output.z * view_position.w) / 100.0));
+	imageStore(debug_4_image, uvi, vec4((1 - (depth + total_velocity.z) / depth) * depth * 100));
 #endif
 }

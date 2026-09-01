@@ -66,7 +66,6 @@ void main()
 		for(int j = 0; j < 40; j++)
 		{
 			imageStore(debug_6_image, uvi * 40 + ivec2(i, j), vec4(max_velocity.xy / float(params.tile_size * 2), i == 0 || j == 0 ? 1.0 : 0.0, 0.0));
-			imageStore(debug_11_image, uvi * 40 + ivec2(i, j), vec4(texelFetch(tile_max_x, uvi * 40 + ivec2(i, j), 0).xy, i == 0 || j == 0 ? 1.0 : 0.0, 0.0));
 		}
 	}
 #endif

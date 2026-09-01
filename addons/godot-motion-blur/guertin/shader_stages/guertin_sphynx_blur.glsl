@@ -9,7 +9,9 @@
 #define PIXEL_RADIUS_SQUARED 0.25
 // At depth difference of 1 / SOFT_DEPTH_SENSITIVITY the velocity weights are
 // at their extremes.
-#define SOFT_DEPTH_SENSITIVITY 1
+#define SOFT_DEPTH_SENSITIVITY 10000
+
+#define Z_VELOCITY_MULTIPLIER 1
 
 #define USE_JITTER
 
@@ -111,15 +113,15 @@ vec4 sample_x_velocity(ivec2 x, float t, vec2 vx, float vx_length, vec2 wvx, flo
 
 	float vzyx = syx.z;
 
-	float x_depth = zx + vzx * t;
+	float x_depth = zx + vzx * Z_VELOCITY_MULTIPLIER * t;
 
-	float yx_depth = zyx + vzyx * t;
+	float yx_depth = zyx + vzyx * Z_VELOCITY_MULTIPLIER * t;
 
-	float soft_overlap_x = cone(x_depth, yx_depth, SOFT_DEPTH_SENSITIVITY);
+	float soft_overlap_x = cone(x_depth, yx_depth, SOFT_DEPTH_SENSITIVITY / (1 + zx));
 
 	x_weight = soft_overlap_x * reaches_weight;
 
-	float overlap_x = soft_compare(x_depth, yx_depth, SOFT_DEPTH_SENSITIVITY);
+	float overlap_x = soft_compare(x_depth, yx_depth, SOFT_DEPTH_SENSITIVITY / (1 + zx));
 
 	x_back_weight = overlap_x;
 	
@@ -151,15 +153,15 @@ vec4 sample_y_velocity(ivec2 x, float t, vec2 vn, float vn_length, vec2 wvn, flo
 	// The z velocity at the sample position.
 	float vzyn = syn.z;
 
-	float x_depth = zx + vzx * t;
+	float x_depth = zx + vzx * Z_VELOCITY_MULTIPLIER * t;
 
 	// TODO @sphynx-owner: understand why we use the negative of the depth
 	// velocity here and not in the sample_x_velocity function.
-	float y_depth = zyn - vzyn * t;
+	float y_depth = zyn - vzyn * Z_VELOCITY_MULTIPLIER * t;
 
 	// We get whether the depth at the sample position plus offset derived from the z velocity is in front
 	// of the depth at the current pixel. Starts at 0 when same depth, and goes to 1 the closer it is.
-	float overlapn = soft_compare(y_depth, x_depth, SOFT_DEPTH_SENSITIVITY);
+	float overlapn = soft_compare(y_depth, x_depth, SOFT_DEPTH_SENSITIVITY / (1 + zx));
 	
 	// If the found velocity is smaller than a pixel's radius, exit early.
 	if (vyn_length < PIXEL_RADIUS || overlapn <= EPSILON) {
@@ -255,6 +257,14 @@ void main() {
 	vec2 vx = sx.xy;
 
 	vec4 base_color = texelFetch(color_sampler, x, 0);
+
+#ifdef DEBUG
+	float x_depth = sx.w;
+
+	float x_;
+
+	imageStore(debug_12_image, uvi, vec4(1));
+#endif
 
 	// We must account for cases where the dominant velocity is 0 even though
 	// The current velocity is not. This is only the case for the skybox, which
