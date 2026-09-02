@@ -135,11 +135,14 @@ void main() {
 	// We get the view-space position at the pixel
 	// ---------------------------------------------------
 	float depth = texelFetch(depth_sampler, uvi, 0).x;
-	
+
 	vec4 view_position = scene_data.inv_projection_matrix * vec4(uv_to_ndc(uvn), depth, 1.0);
 
 	view_position.xyz /= view_position.w;
 	// ---------------------------------------------------
+
+	// We derive a current_uv which we can compare against our manually extracted UVs.
+	vec3 current_uv = vec3(uvn, depth);
 
 	mat4 inv_view_matrix = view_mat3x4_to_mat4(scene_data.inv_view_matrix);
 	
@@ -151,11 +154,9 @@ void main() {
 	mat4 prev_view_matrix = view_mat3x4_to_mat4(previous_scene_data.view_matrix);
 
 	vec4 view_past_position = prev_view_matrix * vec4(world_position.xyz, 1.0);
-
-	vec3 current_uv = vec3(uvn, depth);
 	// ---------------------------------------------------
 
-	// We extract a UV change (and an additional, view-space depth change component)
+	// We extract a UV and depth change
 	// ---------------------------------------------------
 	vec4 view_past_ndc = previous_scene_data.projection_matrix * view_past_position;
 
@@ -261,6 +262,13 @@ void main() {
 		total_velocity = fallback_velocity;
 	}
 	// ---------------------------------------------------
+	
+	// Here is where we apply the velocity thresholds, customized by the user.
+	total_velocity *= sharp_step(
+		params.velocity_lower_threshold,
+		params.velocity_upper_threshold,
+		length(total_velocity.xy)
+	);
 
 	// If the previous position is happening behind the camera's near clip plane, which can happen when the camera moves backwards at high speed,
 	// the w component of the projected vector would be negative, and the velocity vector would be flipped.
@@ -279,15 +287,7 @@ void main() {
 
 	// Here is where the intensity parameter is applied, customized by the user.
 	total_velocity *= params.motion_blur_intensity;
-	
-	// Here is where we apply the velocity thresholds, customized by the user.
-	total_velocity *= sharp_step(
-		params.velocity_lower_threshold,
-		params.velocity_upper_threshold,
-		length(total_velocity.xy)
-	);
 
-	// If depth == 0 (skybox), view_position.z is -inf, which can also be arithmetically achieved with (-1.0 / 0.0).
 	// total_velocity up to this point was backwards, because it was derived using UV differences, which were vectors
 	// pointing to the previous UV, meaning the velocity of the pixel is in the other direction.
 	vec4 final_output = vec4(-total_velocity, depth);
@@ -297,6 +297,6 @@ void main() {
 #ifdef DEBUG
 	imageStore(debug_2_image, uvi, vec4(texelFetch(depth_sampler, uvi, 0).x * 5));
 	imageStore(debug_3_image, uvi, vec4(-sampled_velocity, 0.0, 0.0));
-	imageStore(debug_4_image, uvi, vec4((1 - (depth + total_velocity.z) / depth) * depth * 100));
+	imageStore(debug_4_image, uvi, vec4(final_output.xy / render_size, abs(final_output.z) * 1000, final_output.w));
 #endif
 }

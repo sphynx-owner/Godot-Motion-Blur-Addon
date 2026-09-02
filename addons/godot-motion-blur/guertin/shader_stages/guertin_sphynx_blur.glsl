@@ -1,31 +1,14 @@
 #[compute]
 #version 450
 
-#define FLT_MAX 3.402823466e+38
-#define FLT_MIN 1.175494351e-38
 #define M_PI 3.1415926535897932384626433832795
 #define EPSILON 1e-6
 #define SMALL_EPSILON 1e-9
 #define PIXEL_RADIUS 0.5
 #define PIXEL_RADIUS_SQUARED 0.25
-// At depth difference of 1 / SOFT_DEPTH_SENSITIVITY the velocity weights are
-// at their extremes.
+
+// At depth difference of 1 / SOFT_DEPTH_SENSITIVITY the velocity weights are saturated.
 #define SOFT_DEPTH_SENSITIVITY 10
-
-#define Z_VELOCITY_MULTIPLIER 1
-
-#define USE_JITTER
-
-#ifdef USE_JITTER
-#define TILE_JITTER jitter_tile(uvi)
-
-#define SAMPLE_JITTER j
-
-#else
-#define TILE_JITTER 0
-
-#define SAMPLE_JITTER 0
-#endif
 
 
 layout(set = 0, binding = 0) uniform sampler2D color_sampler;
@@ -67,17 +50,13 @@ float interleaved_gradient_noise(vec2 uv) {
 }
 // ----------------------------------------------------------
 
-// from https://github.com/bradparks/KinoMotion__unity_motion_blur/tree/master
+// from https://github.com/keijiro/KinoMotion
 // ----------------------------------------------------------
-vec2 safenorm(vec2 v) {
-	float l = max(length(v), EPSILON);
-	return v / l * int(l >= 0.5);
-}
-
 ivec2 jitter_tile(ivec2 uvi) {
 	float rx, ry;
 	// HACK @sphynx-owner: multiplying the input uvi seems to help reducing large emergent
 	// patchiness in the blurred results along the jittered seams between tiles.
+	// TODO @sphynx-owner: find a better jitter setup, there are visible striping along the seams between tiles I would like to eliminate.
 	float angle = interleaved_gradient_noise(uvi * 4) * M_PI * 2;
 	rx = cos(angle);
 	ry = sin(angle);
@@ -85,9 +64,19 @@ ivec2 jitter_tile(ivec2 uvi) {
 }
 // ----------------------------------------------------------
 
-vec4 sample_x_velocity(ivec2 x, float t, vec2 vx, float vx_length, vec2 wvx, float zx, float vzx, float soft_depth_sensitivity, ivec2 render_size, out float x_weight, out float x_back_weight) {
-	// TODO @sphynx-owner: do we need to divide by render
-	// size?
+vec4 sample_x_velocity(
+	ivec2 x,
+	float t,
+	vec2 vx,
+	float vx_length,
+	vec2 wvx,
+	float zx,
+	float vzx,
+	float soft_depth_sensitivity,
+	ivec2 render_size,
+	out float x_weight,
+	out float x_back_weight
+) {
 	ivec2 yx = x + ivec2(t * vx);
 
 	if (yx.x < 0 || yx.x > render_size.x || yx.y < 0 || yx.y > render_size.y) {
@@ -114,22 +103,31 @@ vec4 sample_x_velocity(ivec2 x, float t, vec2 vx, float vx_length, vec2 wvx, flo
 
 	float vzyx = syx.z;
 
-	float x_depth = zx + vzx * Z_VELOCITY_MULTIPLIER * t;
+	float x_depth = zx + vzx * t;
 
-	float yx_depth = zyx;
-
-	float soft_overlap_x = cone(x_depth, yx_depth, soft_depth_sensitivity);
+	float soft_overlap_x = cone(x_depth, zyx, soft_depth_sensitivity);
 
 	x_weight = soft_overlap_x * reaches_weight;
 
-	float overlap_x = soft_compare(x_depth, yx_depth, soft_depth_sensitivity);
+	float overlap_x = soft_compare(x_depth, zyx, soft_depth_sensitivity);
 
 	x_back_weight = overlap_x;
 	
 	return texelFetch(color_sampler, yx, 0);
 }
 
-vec4 sample_y_velocity(ivec2 x, float t, vec2 vn, float vn_length, vec2 wvn, float zx, float vzx, float soft_depth_sensitivity, ivec2 render_size, out float y_weight) {
+vec4 sample_y_velocity(
+	ivec2 x,
+	float t,
+	vec2 vn,
+	float vn_length,
+	vec2 wvn,
+	float zx,
+	float vzx,
+	float soft_depth_sensitivity,
+	ivec2 render_size,
+	out float y_weight
+) {
 	// The sample positon along the neighbor_max velocity.
 	ivec2 yn = x + ivec2(t * vn);
 	
@@ -140,12 +138,13 @@ vec4 sample_y_velocity(ivec2 x, float t, vec2 vn, float vn_length, vec2 wvn, flo
 		return vec4(0);
 	}
 
-	// We get the velocity at the sample position.
+	// We sample at the position.
 	vec4 syn = texelFetch(velocity_sampler, yn, 0);
 
 	// The velocity at the sample position.
 	vec2 vyn = syn.xy;
 
+	// Get the length of the dominant velocity
 	float vyn_length = length(vyn);
 
 	// The depth at the sample position.
@@ -154,42 +153,28 @@ vec4 sample_y_velocity(ivec2 x, float t, vec2 vn, float vn_length, vec2 wvn, flo
 	// The z velocity at the sample position.
 	float vzyn = syn.z;
 
-	float x_depth = zx;
+	// get a z-velocity-aware depth estimate
+	float y_depth = zyn - vzyn * t;
 
-	// TODO @sphynx-owner: understand why we use the negative of the depth
-	// velocity here and not in the sample_x_velocity function.
-	float y_depth = zyn - vzyn * Z_VELOCITY_MULTIPLIER * t;
-
-	// We get whether the depth at the sample position plus offset derived from the z velocity is in front
-	// of the depth at the current pixel. Starts at 0 when same depth, and goes to 1 the closer it is.
-	float overlapn = soft_compare(y_depth, x_depth, soft_depth_sensitivity);
+	// Get wether the sampled pixel is in front of the current pixel.
+	float y_in_front = soft_compare(y_depth, zx, soft_depth_sensitivity);
 	
 	// If the found velocity is smaller than a pixel's radius, exit early.
-	if (vyn_length < PIXEL_RADIUS || overlapn <= EPSILON) {
+	if (vyn_length < PIXEL_RADIUS || y_in_front <= EPSILON) {
 		y_weight = 0;
 
 		return vec4(0);
 	}
 
-	// Get the distance of the sampled position from the current pixel (would be the time multiplied by the velocity length,
-	// to match how we offset x to sample the velocity in the first place).
-	float tn = abs(t * vn_length);
-
-	// Get the normalized velocity at the sampled position.
-	vec2 wvyn = vyn / vyn_length;
-
-	// We project the normalized found velocity onto the normalized neighbor_max velocity. This provides us
-	// with a projection value that we can use to compare the found velocity's magnitude given it's alignment
-	// with neighbor_max velocity. The less the found velocity aligns with the neighbor_max velocity, the larger
-	// it would have to be to feasibly reach this pixel.
-	float projected = abs(dot(wvyn, wvn));
+	// get the distance to the sampled pixel.
+	float vn_distance = abs(t * vn_length);
 
 	// y_weight is determined by:
 	// 1. Can the found velocity reach over to this pixel
 	// 2. Is the depth at the found pixel, including its depth velocity, overlap the current one
 	// 3. An additional offset that handles when the neighbor_max velocity is larger than the found velocity
 	// to counteract the resulting opacity dilution.
-	y_weight = step(tn, vyn_length / 2.0 * projected) * overlapn * max(1.05, pow(vn_length / vyn_length, 0.5));
+	y_weight = step(vn_distance, abs(dot(vyn / 2.0, wvn))) * y_in_front * max(1.05, pow(vn_length / vyn_length, 0.5));
 
 	return texelFetch(color_sampler, yn, 0);
 }
@@ -207,21 +192,29 @@ void blend_blur(
 	inout float color_weight,
 	inout float alpha_weight
 ) {
+	// We get an optimistic midground weight.
 	float current_weight_x = max(x_weight, neg_x_weight);
 
+	// We get an optimistic midground color value
 	// TODO @sphynx-owner: figure out a better heuristic to choosing a value. If the weight cannot be larger than
 	// 1, we can simply get the difference between the negative weight and the regular weigth, clamping it between 0 and 1.
 	// this needs to be thoroughly tested.
 	vec4 x_color_sample = mix(neg_x_sample, x_sample, clamp(x_weight / neg_x_weight, 0, 1));
 
+	// We compose the midground, background, and foreground samples based on their weight. Midground is the baseline, on top of it is applied the background, or the "fake transparency", at the top is the dominant-velocity-object blur.
 	vec4 current_color = mix(mix(mix(base_color, x_color_sample, current_weight_x), x_sample, x_back_weight), y_sample, y_weight);
 
+	// current_color_weight enables custom support for transparent background.
 	float current_color_weight = max(current_color.a, 1 - params.transparent_bg);
 
+	// accumulate into the color sum
 	color_sum += vec4(current_color.rgb * current_color_weight, current_color.a);
 
+	// accumulate into th ecolor weight
 	color_weight += current_color_weight;
 
+	// color_weight would have been += 1 too but we want
+	// to support transparent background so only the alpha weight is agnostic.
 	alpha_weight += 1;
 }
 
@@ -238,23 +231,19 @@ void main() {
 		return;
 	}
 
-	// We convert the pixel position into a texturing sampling position
-	// we add 0.5 to offset the sampling to be in the "middle" of the pixel
-	// and avoid artifacts caused by bilinear interpolation.
+	// x is the pixel we will start sampling from.
 	ivec2 x = uvi;
 
-	ivec2 neighbor_max_uvi = (uvi + TILE_JITTER) / params.tile_size;
+	// get the pixel to sample from the neighbor_max texture.
+	ivec2 neighbor_max_uvi = (x + jitter_tile(x)) / params.tile_size;
 
-	// We get the neighbor-max velocity for the tile we are in, with some jitter
-	// between tiles to hide seams between them.
-	// TODO @sphynx-owner: figure out the most optimized way to generate the different textures and sample them.
-	// Technically working in screen space is the more correct way to operate because it would reduce the infulence
-	// of the screen's aspect ratio, so we cannot get rid of the render size modifiers, maybe commit to them more?
+	// We get the neighbor-max velocity for the tile we are in, with some jitter to hide the seams.
 	vec2 vn = texelFetch(neighbor_max, neighbor_max_uvi, 0).xy;
 
-	// We get the true velocity at the current pixel
+	// We get data at the current pixel
 	vec4 sx = texelFetch(velocity_sampler, x, 0);
 
+	// UV velocity data
 	vec2 vx = sx.xy;
 
 	vec4 base_color = texelFetch(color_sampler, x, 0);
@@ -288,7 +277,7 @@ void main() {
 	// We must account for cases where the dominant velocity is 0 even though
 	// The current velocity is not. This is only the case for the skybox, which
 	// Will never overlap geometry so it can safely be ignored when calculating neighbor_max
-	// NOTE @sphynx-owner: using PIXEL_RADIUS_SQUARED cause we compare against the squared length.
+	// NOTE @sphynx-owner: using PIXEL_RADIUS_SQUARED because we compare against the squared length.
 	if(dot(vn, vn) < PIXEL_RADIUS_SQUARED && dot(vx, vx) < PIXEL_RADIUS_SQUARED)
 	{
 		imageStore(output_color, uvi, base_color);
@@ -302,26 +291,29 @@ void main() {
 		return;
 	}
 
+	// Length of neighbor_max velocity
 	float vn_length = length(vn);
 
 	// We normalize neighbor-max velocity
 	vec2 wvn = vn / vn_length;
 
+	// Length of current pixel's velocity
 	float vx_length = length(vx);
 
+
+	// We normalize the current pixel's velocity
 	vec2 wvx = vx / vx_length;
 
 	// Get the depth at current pixel
 	float zx = sx.w;
 
-	// Get the depth velocity at current pixel
+	// Get z velocity at current pixel
 	float vzx = sx.z;
 
+	// We generate a depth sensitivity based on the depth of the current pixel. The further it is away, the closer to 0 the depth would be, and thus the greater the sensitivity.
 	float soft_depth_sensitivity = SOFT_DEPTH_SENSITIVITY / max(SMALL_EPSILON, zx);
 
-	// We get some random value for the current pixel between 0 and 1. This will be used to
-	// jitter the blur sampling, and achieve smoother looking blur gradient
-	// with a fraction of the sample count.
+	// Get a sample jitter value
 	float j = interleaved_gradient_noise(uvi);
 
 	float color_weight = EPSILON;
@@ -331,16 +323,15 @@ void main() {
 	// Create an initial color sum
 	vec4 sum = vec4(base_color.rgb * base_color.a * color_weight, base_color.a * alpha_weight);
 
+	float inv_sample_count = 1.0 / params.sample_count;
+
 	for(int i = 0; i < params.sample_count; i++)
 	{
-		float ti = float(i + SAMPLE_JITTER) / params.sample_count;
-
-		float neg_ti = float(i + 1 - SAMPLE_JITTER) / params.sample_count;
-
-		// A point in time along the blur interval, used to scale velocity vectors to sample for color.
-		float t = mix(0, -0.5, ti);
+		// time offset
+		float t = mix(0, -0.5, float(i + j) * inv_sample_count);
 		
-		float neg_t = mix(0, 0.5, neg_ti);
+		// opposite time offset
+		float neg_t = mix(0, 0.5, float(i + 1 - j) * inv_sample_count);
 
 		float x_weight;
 

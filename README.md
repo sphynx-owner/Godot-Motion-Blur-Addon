@@ -84,22 +84,23 @@ A practical real-time motion blur effect does not have the luxury of averaging t
 
 Instead of saying that motion blur is the average of color over a period of time, we can say that it's the smearing and dilution (losing opacity) of objects along their motion over a period of time.
 
-This is what the motion blur effect in this addon does.
-
 Let's say this is our input (the cube is moving to the left):
 
-![alt text](readme_assets/playground_1_plain_color.png)
+![alt text](readme_assets/playground_input.png)
 
-You can mentally divide the way the real-time motion blur works into 2 distinct processes:
+The way this motion blur works can be separated into 3 distinct-yet-complementary layers:
 
-1. ***Smearing the current object's color*** - This uses the velocities directly written by the current object, so it's confined to the current object's silhouette. In addition to smearing the current object's color, it accepts any color from geometry that's further from the camera than the current object, achieving "fake transparency".
-![alt text](readme_assets/playground_1_x_weight_only.png)
+1. ***Smearing the current object's color*** - Using the velocities directly written by the current object, we can scavange for similar depth objects that match in velocity (which will most of the time be pixels from the same object), and avegrage the current object's color using them. Since it's using the object's velocities, it's confined to the current object's silhouette.
+![alt text](readme_assets/playground_midground_only.png)
+
+1. ***faking the current object's transparency*** - Using the velocities directly written by the current object we can also scavange for background geometry (geometry that's further from the camera than the current object), and collect color from it to create this sort of camoflaging effect. Since the object is at motion, and is going to be covered by the next layer, this usually goes unnoticed. This works especially well against simple backgrounds or backgrounds with geometry that flows with the motion. This stage is also confined to the object's silhouette.
+![alt text](readme_assets/playground_background_only.png)
 
 2. ***Accepting the extended blur of other objects*** - This requires some form of velocity dilation, which extends dominant velocities in the velocity texture beyond their original silhouettes. The dilated velocities are then used to "search" for objects that match in their velocity and are closer to the camera than the current object. We then blur these objects onto the current object. In this example, the back wall sees dominant velocities from the cube, and collects color from it onto itself.
-![alt text](readme_assets/playground_1_y_weight_only.png)
+![alt text](readme_assets/playground_foreground_only.png)
 
 When designed to naturally complete each other, combining the two processes results in a seamless and believable approximation.
-![alt text](readme_assets/playground_1_combined_weights.png)
+![alt text](readme_assets/playground_output.png)
 
 ### Godot's limitations
 
@@ -107,7 +108,7 @@ Godot provides us with a motion-vectors texture, and it's not without its caveat
 
 - Motion vectors are actually not motion vectors. They are the UV space change of each pixel from the last frame, they point to the previous UV of the object. To actually use them as velocities, we have to negate them.
 - The user has no control over them, so they cannot be selectively disabled or enabled for individual meshes (custom motion vector support is in the works).
-- Motion vectors are not written for background and skyboxes
+- Motion vectors are not written for background and skyboxes.
 - Some render settings like enabling FSR2 modify how these motion vectors behave.
 - As of now there are glitches with objects that are spawned in, and sharp direction changes of the camera movement.
 - If the camera moves backwards really fast along a surface, you can see velocity vectors that point to a position behind the camera's near clip plane. This leads to these velocities being flipped, and in addition results in asymptotical behavior the closer these previos positions are to the near clip plane.
@@ -116,19 +117,19 @@ I am solving some of these issues in this addon.
 
 ### Z Velocities
 
-Most standard motion blur implementations use the xy channels to store velocity onto a texture. It works very well, but the lack of z velocity information (how fast the object moves towards or away from the camera) can lead to unwanted artifacts in scenarios where these velocities are dominant.
-
-Such scenarios can be commonly found in racing games, where you can see the road disappear or appear from under a speeding car. Considering that the racing game genre is amongst the most valid genres to apply motion blur to, it makes accounting for such artifacts a worthy task.
-
 As described in [this section](#real-time-post-process-motion-blur-is-different), The depth of objects matter in how they are blurred. Objects smear their own color and the color of any objects further than them, and they accept the color of dominant-velocity objects that are in front of them.
 
-So what happens when something moves away from the camera, like the road under a speeding car?
+Most standard motion blur implementations use the xy channels to store velocity onto a texture. It works very well, but the lack of z velocity information (how fast the object moves towards or away from the camera) can lead to unwanted artifacts in scenarios where these velocities are dominant.
+
+Such scenarios can be commonly found in racing games. Considering that the racing game genre is amongst the most valid genres to apply motion blur to, it makes accounting for such artifacts a worthy task.
+
+It's common in racing games to follow a car with the camera from the front, and see the road disappear underneath it.
 
 If we only use the xy velocity of the road (it's perceived change), we can only use the static depth information from the depth texture to compare against the car.
 
-This means that the portion of the road that's in front of the car is treated as if it moves upwards in 2 dimensions. Since it's closer to the camera than the car is, the car thinks it should accept that road as a foreground, dominant-velocity object, blurring it on top. From the road's perspective, it looks to smear its color, and because it is in front of the car, it treats the car as background, and adds color from it to fake its own transparency.
+This means that the portion of the road that's in front of the car is treated as if it moves upwards in 2 dimensions. Since it's closer to the camera than the car is, the car thinks it should accept that road as a foreground, dominant-velocity object, blurring it on top. From the road's perspective because it is in front of the car, it treats the car as background, and adds color from it to fake its own transparency.
 
-These artifacts look like this:
+The resulting artifacts can look like this:
 
 ![alt text](readme_assets/without_z_velocity.png)
 
@@ -150,7 +151,7 @@ You can see this behavior in the example of [a previous section](#real-time-post
 
 Engines like Unreal Engine provide tangential velocities in its velcoity texture, derived from the object's linear and angular velocity values. They work well with centered blur, as tangent velocities estimate the object's actual trajectory equally well both forwards and backwards.
 
-However, Godot's velocity texture is actually just a UV-change texture. So the value of each pixel points to it's past screen UV.
+However, Godot's velocity texture is just a UV-change texture. So the value of each pixel points to it's past screen UV.
 
 This means that the "most correct' blurring in godot would happen *backwards* in time, bridging the object to its past position.
 
@@ -192,7 +193,7 @@ To pull this off, the motion blur samples in *both directions* at the same time,
 
 This means that to get the same sampling resolution, we can iterate half as much, as we do double the sampling in each iteration.
 
-Then, if it runs into an invalid sample, it can see if the other side has a valid sample and use it instead.
+When runs into an invalid sample, it can see if the other side has a valid sample and use it instead.
 
 The reason this requires sampling in both directions at the same time, is to maintain the weight-distribution coherency. Trying to reuse old samples in the accumulated color sum would lead to inconsistencies in that regard.
 
@@ -240,9 +241,9 @@ In the current implementation, this stage is also in charge of other nice-to-hav
 * It separates motion vectors into separate components attributed to camera motion, camera rotation, and object motion, and allows tuning them separately.
 * It fixes broken velocities when FSR2 is enabled.
 * It fixes broken velocities when the camera moves backwards very fast.
-* It clamps velocities to be no larger than 2 tiles.
+* It clamps velocities' length to be no larger than the span of 2 tiles.
 * It repurposes the code that generates velocities for background pixels to also generate Z velocities (in view space) for static environment, and stores them in the blue channel.
-* It stores view-space depth in the alpha channel to be used with the generated Z velocities.
+* It stores depth in the alpha channel to be used with the generated Z velocities (one less texture sampling on the motion blur stage).
 
 #### Implementation Walkthrough
 
@@ -278,6 +279,11 @@ vec4 view_position = scene_data.inv_projection_matrix * vec4(uv_to_ndc(uvn), dep
 
 view_position.xyz /= view_position.w;
 ```
+We derive a current_uv which we can compare against our manually extracted UVs.
+
+```glsl
+vec3 current_uv = vec3(uvn, depth);
+```
 
 We take the view position, transform it to a world position, and then back to a view position using the *previous view matrix*, resulting in an estimation of where the pixel was last frame in view space. This estimation only works for static environment. It breaks for moving objects.
 
@@ -291,18 +297,18 @@ mat4 prev_view_matrix = view_mat3x4_to_mat4(previous_scene_data.view_matrix);
 vec4 view_past_position = prev_view_matrix * vec4(world_position.xyz, 1.0);
 ```
 
-We extract a UV change (and an additional, view-space depth change component, which will be the z velocity).
+We extract a UV and depth change.
 
 ```glsl
 vec4 view_past_ndc = previous_scene_data.projection_matrix * view_past_position;
 
 view_past_ndc.xyz /= view_past_ndc.w;
 
-vec3 past_uv = vec3(ndc_to_uv(view_past_ndc.xy), view_past_position.z);
+vec3 past_uv = vec3(ndc_to_uv(view_past_ndc.xy), view_past_ndc.z);
 
 vec4 view_past_ndc_cache = view_past_ndc;
 
-vec3 camera_uv_change = past_uv - vec3(uvn, view_position.z);
+vec3 camera_uv_change = past_uv - current_uv;
 ```
 
 We do a similar process, but this time only using the rotation part of the view matrices, resulting in the part of the UV change that was caused by the rotation between frames.
@@ -316,15 +322,9 @@ view_past_ndc = previous_scene_data.projection_matrix * view_past_position;
 
 view_past_ndc.xyz /= view_past_ndc.w;
 
-past_uv = vec3(ndc_to_uv(view_past_ndc.xy), view_past_position.z);
+past_uv = vec3(ndc_to_uv(view_past_ndc.xy), view_past_ndc.z);
 
-vec3 camera_rotation_uv_change = past_uv - vec3(uvn, view_position.z);
-```
-
-By subtracting the rotation part of the UV change from the total UV change, we can arriveat the UV change that was cause by the camera's movement.
-
-```glsl
-vec3 camera_movement_uv_change = camera_uv_change - camera_rotation_uv_change;
+vec3 camera_rotation_uv_change = past_uv - current_uv;
 ```
 
 By subtracting the rotation part of the UV change from the total UV change, we can arrive at the UV change that was cause by the camera's movement.
@@ -374,7 +374,7 @@ if (dot(sampled_velocity * render_size, sampled_velocity * render_size) > PIXEL_
 By subtracting the "original" UV change stored on base_velocity from the manuall-derived camera UV change, we end up with the UV change that was caused by the object's motion
 
 ```glsl
-vec3 object_uv_change = base_velocity - camera_uv_change.xyz;
+vec3 object_uv_change = base_velocity - camera_uv_change;
 ```
 
 Now that we have the 3 components that make the original motion vectors isolated, we can put them back together after tuning them however we like. We assume that component magnitudes are between 0 and 1. This must be enforced on the editor interface level.
@@ -404,12 +404,6 @@ if (length(total_velocity.xy) > length(fallback_velocity.xy)) {
 }
 ```
 
-Here is where the intensity parameter is applied, customized by the user.
-
-```glsl
-total_velocity *= params.motion_blur_intensity;
-```
-
 Here is where we apply the velocity thresholds, customized by the user.
 
 ```glsl
@@ -418,14 +412,6 @@ total_velocity *= sharp_step(
     params.velocity_upper_threshold,
     length(total_velocity.xy)
 );
-```
-
-From this point on we process the velocities for stability and robustness.
-
-When the past ndc is behind the camera's near plane (or origin, not sure), the velocities asymptotally scale to infinity. This is a natural, undesirable behavior that occurs when the camera moves backwards rapidly. We tame these values by clamping their length to 1.
-
-```glsl
-clamp_length(total_velocity, total_velocity.xy, 1.0);
 ```
 
 If the previous position is happening behind the camera, which can happen when the camera moves backwards at high speed, the w component of the projected vector would be negative, and the velocity vector would be flipped. This happens with Godot's native motion vectors as well. We can detect this and flip them back, avoiding crazy artifacts.
@@ -442,10 +428,16 @@ float clamp_size = params.tile_size * 2;
 clamp_length(total_velocity, total_velocity.xy, clamp_size);
 ```
 
-If depth == 0 (skybox), view_position.z is -inf, which can also be arithmetically achieved with (-1.0 / 0.0).
+Here is where the intensity parameter is applied, customized by the user. The reason it is applied here after all the clamping, and not earlier, is that it makes intuitive sense to be the final say on how the blur looks. When applied earlier, it may be weird for users to see nothing change until the intensity is low enough for clamping to not be saturated.
 
 ```glsl
-vec4 final_output = vec4(total_velocity, view_position.z);
+total_velocity *= params.motion_blur_intensity;
+```
+
+total_velocity up to this point was backwards, because it was derived using UV differences, which were vectors pointing to the previous UV, meaning the velocity of the pixel is in the other direction.
+
+```glsl
+vec4 final_output = vec4(-total_velocity, depth);
 
 imageStore(vector_output, uvi, final_output);
 ```
@@ -511,3 +503,46 @@ This stage generates the motion blur.
 
 #### Implementation Walkthrough
 
+##### The functions
+
+###### soft_compare
+
+```glsl
+float soft_compare(float a, float b, float sze) {
+	return clamp(sze * (a - b), 0, 1);
+}
+```
+
+This funciton is a soft step function with variable softness. It's used to compare depth values, the softness helps keeping changes in depth-affected behavior seamless.
+
+###### cone
+
+```glsl
+float cone(float a, float b, float sze) {
+	return clamp(1 - sze * abs(a - b), 0, 1);
+}
+```
+
+This function complements `soft_compare`, and serves a similar purpose. It starts at 1 with the two depths being equal, and becomes smaller the further apart the depths are.
+
+###### interleaved_gradient_noise
+
+```glsl
+float interleaved_gradient_noise(vec2 uv) {
+	uv += float(params.frame) * 5.588238;
+
+	vec3 magic = vec3(0.06711056, 0.00583715, 52.9829189);
+
+	return fract(magic.z * fract(dot(uv, magic.xy)));
+}
+```
+
+This is an industry-standard noise fetched from 
+
+## Sources
+
+1. [Call of Duty's post processing slideshow (interleaved gradient noise)](https://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare/)
+
+2. [demofox's blog discussing interleaved gradient noise](https://blog.demofox.org/2022/01/01/interleaved-gradient-noise-a-different-kind-of-low-discrepancy-sequence/)
+
+3. [keyjiro's KinoMotion repo](https://github.com/keijiro/KinoMotion)
