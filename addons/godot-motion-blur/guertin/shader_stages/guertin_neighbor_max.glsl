@@ -4,7 +4,7 @@
 #define FLT_MAX 3.402823466e+38
 #define FLT_MIN 1.175494351e-38
 #define COS_45 0.70710678118 // sqrt(2.0)/2.0
-#define SQRT_2 1.41421356237
+#define ONE_OVER_SQRT_2 0.70710678118 // 1/sqrt(2.0) = sqrt(2.0)/2.0 = COS_45
 
 layout(set = 0, binding = 0) uniform isampler2D tile_max;
 layout(rg8i, set = 0, binding = 1) uniform writeonly iimage2D neighbor_max;
@@ -48,7 +48,7 @@ void main()
 
 			float current_neighbor_velocity_length = length(current_neighbor_velocity);
 
-			bool can_reach_tile = abs(dot(current_neighbor_velocity / max(1e-6, current_neighbor_velocity_length), current_offset / SQRT_2)) > COS_45;
+			bool can_reach_tile = abs(dot(current_neighbor_velocity / max(1e-6, current_neighbor_velocity_length), current_offset * ONE_OVER_SQRT_2)) > COS_45;
 
 			if(is_diagonal && !can_reach_tile)
 			{
