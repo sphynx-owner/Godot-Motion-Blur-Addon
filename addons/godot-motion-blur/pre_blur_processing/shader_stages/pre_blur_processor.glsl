@@ -279,6 +279,7 @@ void main() {
 	// Now we clamp the velocity magnitudes to the tile size. This is a pretty important step that greatly
 	// improves stability and robustness. We mutliply the tile size by 2 here, because we blur the velocity
 	// symmetrically forwards and backwards, so it's radius is half its magnitude.
+	// NOTE @sphynx-owner: this clamp also handles the asymptotical behavior of near-clip-plane previous positions' velocities.
 	// ---------------------------------------------------
 	float clamp_size = params.tile_size * 2;
 

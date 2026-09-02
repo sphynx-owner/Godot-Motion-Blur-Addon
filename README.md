@@ -63,7 +63,7 @@ Recently, however, I was able to allocate the appropriate time and effort to thi
 
 Over the past few weeks I've developed a suite of tools to help iterate, benchmark, and showcase the motion blur with relative ease.
 
-At the time of writing this, the motion blur is nearly unrecognizable compared to when I started. Better in many ways.
+At the time of writing this, the motion blur is nearly unrecognizeable compared to when I started. Better in many ways.
 
 This repo aims to be a reference for engine maintainers in hopes of proving its feasibility as a native engine feature. If it does not end up achieving that, it could be the new-and-improved motion blur addon for Godot.
 
@@ -71,7 +71,7 @@ This repo aims to be a reference for engine maintainers in hopes of proving its 
 
 ### What Is Motion Blur
 
-I am not qualified to discuss real-world phenomenon like camera blur or the blur perceived by our eyes and brain. The definition I will go with is simple yet solid for our purposes:
+I am not qualified to discuss real-world phenomenon like camera blur or the blur perceived by our eyes and brain. The definition I will go with is simple yet solid enough for our purposes:
 
 Motion blur is an artifact resulting from **the averaging of perceived light over a period of time**.
 
@@ -95,23 +95,23 @@ The way this motion blur works can be separated into 3 distinct-yet-complementar
 1. ***Smearing the current object's color*** - Using the velocities directly written by the current object, we can scavange for similar-depth pixels that match in velocity, assume they belong to the same current object, and avegrage the color using them. Since it's using the object's velocities, it's confined to the current object's silhouette.
 ![alt text](readme_assets/playground_midground_only.png)
 
-1. ***faking the current object's transparency*** - Using the velocities directly written by the current object we can also scavange for background geometry (geometry that's further from the camera than the current object), and collect color from it to create this sort of camouflaging effect. Since the object is at motion, and is going to be covered by the next layer, this usually goes unnoticed. This works especially well against simple backgrounds or backgrounds with geometry that flows with the motion. This stage is also confined to the object's silhouette.
+1. ***faking the current object's transparency*** - Using the velocities directly written by the current object we can also scavange for background geometry (geometry that's further from the camera than the current object), and collect color from it to create this sort of camouflaging effect. Since the object is at motion, and is going to be covered by the next layer, this usually goes unnoticed. This works especially well against simple backgrounds or backgrounds with geometry that flows with the motion. This layer is also confined to the object's silhouette.
 ![alt text](readme_assets/playground_background_only.png)
 
-2. ***Accepting the extended blur of other objects*** - This requires some form of velocity dilation, which extends dominant velocities in the velocity texture beyond their original silhouettes. The dilated velocities are then used to "search" for objects that match in their velocity and are closer to the camera than the current object. We then blur these objects onto the current object. In this example, the back wall sees dominant velocities from the cube, and collects color from it onto itself.
+2. ***Accepting the extended blur of other objects*** - This requires some form of velocity dilation, which extends dominant velocities in the velocity texture beyond their original silhouettes. The dilated velocities are then used to "search" for objects that match them in their velocity and are closer to the camera than the current object. We then blur these objects onto the current object. In this example, the back wall sees dominant velocities from the cube, and collects color from it onto itself.
 ![alt text](readme_assets/playground_foreground_only.png)
 
-When designed to naturally complete each other, combining the two processes results in a seamless and believable approximation.
+When designed to naturally complete each other, combining the 3 layers results in a seamless and believable approximation.
 ![alt text](readme_assets/playground_output.png)
 
 ### Godot's limitations
 
 Godot provides us with a motion-vectors texture, and it's not without its caveats:
 
-- Motion vectors are actually not motion vectors. They are the UV space change of each pixel from the last frame, they point to the previous UV of the object. To actually use them as velocities, we have to negate them.
+- Motion vectors are actually not motion vectors. They are the screen UV change of objects from the last frame. To actually use them as velocities, we have to negate them.
 - The user has no control over them, so they cannot be selectively disabled or enabled for individual meshes (custom motion vector support is in the works).
 - Motion vectors are not written for background and skyboxes.
-- Some render settings like enabling FSR2 modify how these motion vectors behave.
+- Some render settings like enabling FSR2 drastically modify how these motion vectors behave.
 - As of now there are glitches with objects that are spawned in, and sharp direction changes of the camera movement.
 - If the camera moves backwards really fast along a surface, you can see velocity vectors that point to a position behind the camera's near clip plane. This leads to these velocities being flipped, and in addition results in asymptotical behavior the closer these previos positions are to the near clip plane.
 
@@ -127,7 +127,7 @@ Such scenarios can be commonly found in racing games. Considering that the racin
 
 It's common in racing games to follow a car with the camera from the front, and see the road disappear underneath it.
 
-If we only use the xy velocity of the road (it's perceived change), we can only use the static depth information from the depth texture to compare against the car.
+If we only use the xy velocity of the road (it's screen UV change), we can only use the static depth information from the depth texture to compare against the car.
 
 This means that the portion of the road that's in front of the car is treated as if it moves upwards in 2 dimensions. Since it's closer to the camera than the car is, the car thinks it should accept that road as a foreground, dominant-velocity object, blurring it on top. From the road's perspective because it is in front of the car, it treats the car as background, and adds color from it to fake its own transparency.
 
@@ -135,11 +135,11 @@ The resulting artifacts can look like this:
 
 ![alt text](readme_assets/without_z_velocity.png)
 
-If we have the z component of the velocity, we can use it when testing the depth of the road, so by the time samples reach the car they are also aware of how much more further they are from the camera, and thus behind the car.
+If we have the z component of the velocity, we can use it when testing the depth of the road, so by the time samples reach the car they are also aware of how much further they are from the camera, and thus behind the car.
 
-The car also knows that by the time it's dominant velocity sampling reaches the road, that road is further and further away from the camera, and it does not sample from it.
+The car also knows that by the time it's dominant-velocity sampling reaches the road, that road is further away behind it, and it does not sample from it.
 
-This is the result:
+This improves visual robustness:
 
 ![alt text](readme_assets/with_z_velocity.png)
 
@@ -153,9 +153,9 @@ You can see this behavior in the example of [a previous section](#real-time-post
 
 Engines like Unreal Engine provide tangential velocities in its velcoity texture, derived from the object's linear and angular velocity values. They work well with centered blur, as tangent velocities estimate the object's actual trajectory equally well both forwards and backwards.
 
-However, Godot's velocity texture is just a UV-change texture. So the value of each pixel points to it's past screen UV.
+However, Godot's velocity texture is just a UV-change texture, the value at each pixel points to it's past screen UV.
 
-This means that the "most correct' blurring in godot would happen *backwards* in time, bridging the object to its past position.
+This means that the "most correct' blurring in godot would happen *fully backwards* in time, bridging the object to its past position.
 
 But it should **never** be done.
 
@@ -191,13 +191,11 @@ To solve this, we can leverage the fact we are sampling in both directions, and 
 
 ![alt text](readme_assets/with_double_sampling.png)
 
-To pull this off, the motion blur samples in *both directions* at the same time, starting from the middle.
+To pull this off, the motion blur samples in *both directions at the same time*, starting from the middle.
 
-This means that to get the same sampling resolution, we can iterate half as much, as we do double the sampling in each iteration.
+This means that we can iterate half as much, as we do double the sampling in each iteration.
 
-When runs into an invalid sample, it can see if the other side has a valid sample and use it instead.
-
-The reason this requires sampling in both directions at the same time, is to maintain the weight-distribution coherency. Trying to reuse old samples in the accumulated color sum would lead to inconsistencies in that regard.
+The reason this requires sampling in both directions at the same time, is to maintain the color weight distribution. Trying other solutions like reusing old samples in the accumulated color sum could lead to color inaccuracy.
 
 ### The Pipeline
 
@@ -209,7 +207,7 @@ It uses the scene data buffer and the depth, velocity and color textures provide
 
 There are 5 compute stages in the pipeline:
 
-1. **Pre Processing** - Takes the depth and velocity textures, as well as scene data, and Generates a processet velocity-depth texture with improved velocity and depth information. It's most crucial functionality is adding motion vectors to background pixels.
+1. **Pre Processing** - Takes the depth and velocity textures, as well as scene data, and Generates a processed velocity-depth texture. It's most crucial functionality is adding motion vectors to background pixels.
 
 2. **Tile Max X** - Finds and stores the largest velocity in each tile's row.
 
@@ -239,12 +237,12 @@ The main purpose of this stage is to generate missing information, specifically 
 
 In the current implementation, this stage is also in charge of other nice-to-have features:
 
-* It transforms velocities to be in pixel space instead of UV space.
+* It transforms velocities to be in pixel space.
 * It separates motion vectors into separate components attributed to camera motion, camera rotation, and object motion, and allows tuning them separately.
 * It fixes broken velocities when FSR2 is enabled.
 * It fixes broken velocities when the camera moves backwards very fast.
 * It clamps velocities' length to be no larger than the span of 2 tiles.
-* It repurposes the code that generates velocities for background pixels to also generate Z velocities (in view space) for static environment, and stores them in the blue channel.
+* It generate Z velocities (in view space) for static environment, and stores them in the blue channel.
 * It stores depth in the alpha channel to be used with the generated Z velocities (one less texture sampling on the motion blur stage).
 
 ### Tile Max X Stage
@@ -258,8 +256,6 @@ This is the first stage in the process of creating the **tile max** texture. The
 By dividing this lookup process to a horizontal pass, and then a vertical pass on the result in the following Tile Max Y stage, we reduce the complexity to linear, only running `tile_size * 2` synchronous operations in total.
 
 So in this stage we are really performing a *tile row max* pass.
-
-The implementation is pretty straight forward, a walkthrough is not necessary.
 
 ### Tile Max Y Stage
 
@@ -279,7 +275,7 @@ This the velocity dilation stage. Dominant velocities are extended onto neighbor
 
 #### Implementation Details
 
-The implementation is also pretty straight forward, except for the diagonal tile discarding logic.
+The implementation is pretty straight forward, except for the diagonal tile discarding logic.
 
 The way it works is that it discards of diagonal tiles that the velocity could never reach.
 
@@ -306,7 +302,10 @@ The implementation of this stage with detailed comments throughout can be found 
 
 #### Purpose
 
-This stage generates the motion blur.
+This stage generates the motion blur. It executes on the concepts described in [Real-Time Post-Process Motion Blur is Different](#real-time-post-process-motion-blur-is-different),
+[Z Velocities](#z-velocities),
+[Centered Blur](#centered-blur), and
+[Taking Centered Blur a Step Further](#taking-centered-blur-a-step-further).
 
 ## Sources
 
@@ -320,4 +319,4 @@ This stage generates the motion blur.
 
 5. [godot motion blur addon simplified](https://github.com/sphynx-owner/godot-motion-blur-addon-simplified)
 
-6. [this PR](https://github.com/godotengine/godot/pull/115027)
+6. [Godot's motion blur pull request](https://github.com/godotengine/godot/pull/115027)
