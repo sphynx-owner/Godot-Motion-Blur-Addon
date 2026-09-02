@@ -77,38 +77,44 @@ vec4 sample_x_velocity(
 	out float x_weight,
 	out float x_back_weight
 ) {
+	// The sample positon along the current velocity.
 	ivec2 yx = x + ivec2(t * vx);
 
+	// If the position is outside the texture bounds, exit early.
 	if (yx.x < 0 || yx.x > render_size.x || yx.y < 0 || yx.y > render_size.y) {
 		x_weight = 0;
 
+		x_back_weight = 0;
+
 		return vec4(0);
 	}
-
+	
+	// We sample at the position.
 	vec4 syx = texelFetch(velocity_sampler, yx, 0);
 
+	// The UV velocity at the sample position.
 	vec2 vyx = syx.xy;
 
-	float vyx_length = length(vyx);
-
+	// Get the distance to the sampled pixel
 	float tx = abs(t * vx_length);
 
-	vec2 wvyx = vyx / vyx_length;
+	// Whether the found velocity reaches the current pixel
+	float reaches_weight = step(tx, abs(dot(vyx * 0.5, wvx)));
 
-	float projected = abs(dot(wvyx, wvx));
-
-	float reaches_weight = step(tx, vyx_length / 2.0 * projected);
-
+	// Get the depth at the sampled pixel
 	float zyx = syx.w;
 
-	float vzyx = syx.z;
-
+	// get a z-velocity-aware depth estimate of the current pixel
 	float x_depth = zx + vzx * t;
 
+	// get the depth similarity
 	float soft_overlap_x = cone(x_depth, zyx, soft_depth_sensitivity);
 
+	// derive the midground weight. It's defined by
+	// how close in depth the found pixel is, and if it's velocity would reach the current pixel.
 	x_weight = soft_overlap_x * reaches_weight;
 
+	// whether the sampled pixel is behind the current pixel
 	float overlap_x = soft_compare(x_depth, zyx, soft_depth_sensitivity);
 
 	x_back_weight = overlap_x;
@@ -131,7 +137,7 @@ vec4 sample_y_velocity(
 	// The sample positon along the neighbor_max velocity.
 	ivec2 yn = x + ivec2(t * vn);
 	
-	// If the found velocity is smaller than a pixel's radius, exit early.
+	// If the position is outside the texture bounds, exit early.
 	if (yn.x < 0 || yn.x > render_size.x || yn.y < 0 || yn.y > render_size.y) {
 		y_weight = 0;
 
@@ -141,10 +147,10 @@ vec4 sample_y_velocity(
 	// We sample at the position.
 	vec4 syn = texelFetch(velocity_sampler, yn, 0);
 
-	// The velocity at the sample position.
+	// The UV velocity at the sample position.
 	vec2 vyn = syn.xy;
 
-	// Get the length of the dominant velocity
+	// Get the length of the found velocity
 	float vyn_length = length(vyn);
 
 	// The depth at the sample position.
@@ -153,7 +159,7 @@ vec4 sample_y_velocity(
 	// The z velocity at the sample position.
 	float vzyn = syn.z;
 
-	// get a z-velocity-aware depth estimate
+	// get a z-velocity-aware depth estimate of the sampled pixel
 	float y_depth = zyn - vzyn * t;
 
 	// Get wether the sampled pixel is in front of the current pixel.
@@ -170,11 +176,11 @@ vec4 sample_y_velocity(
 	float vn_distance = abs(t * vn_length);
 
 	// y_weight is determined by:
-	// 1. Can the found velocity reach over to this pixel
-	// 2. Is the depth at the found pixel, including its depth velocity, overlap the current one
+	// 1. If the found velocity reach over to this pixel.
+	// 2. If the depth at the sampled pixel in front of the current one.
 	// 3. An additional offset that handles when the neighbor_max velocity is larger than the found velocity
 	// to counteract the resulting opacity dilution.
-	y_weight = step(vn_distance, abs(dot(vyn / 2.0, wvn))) * y_in_front * max(1.05, pow(vn_length / vyn_length, 0.5));
+	y_weight = step(vn_distance, abs(dot(vyn * 0.5, wvn))) * y_in_front * max(1.05, pow(vn_length / vyn_length, 0.5));
 
 	return texelFetch(color_sampler, yn, 0);
 }
@@ -328,33 +334,39 @@ void main() {
 	for(int i = 0; i < params.sample_count; i++)
 	{
 		// time offset
-		float t = mix(0, -0.5, float(i + j) * inv_sample_count);
+		float t = mix(0, 0.5, float(i + j) * inv_sample_count);
 		
 		// opposite time offset
-		float neg_t = mix(0, 0.5, float(i + 1 - j) * inv_sample_count);
+		float neg_t = mix(0, -0.5, float(i + 1 - j) * inv_sample_count);
 
 		float x_weight;
 
 		float x_back_weight;
 		
+		// get the midground and background weights (color smearing and fake transparency, respectively)
 		vec4 x_sample = sample_x_velocity(x, t, vx, vx_length, wvx, zx, vzx, soft_depth_sensitivity, render_size, x_weight, x_back_weight);
 		
 		float neg_x_weight;
 
 		float neg_x_back_weight;
 
+		// get the midground and background weights in the opposite direction
 		vec4 neg_x_sample = sample_x_velocity(x, neg_t, vx, vx_length, wvx, zx, vzx, soft_depth_sensitivity, render_size, neg_x_weight, neg_x_back_weight);
 
 		float y_weight;
 
+		// get the foreground weight (dominant object to blur over us)
 		vec4 y_sample = sample_y_velocity(x, t, vn, vn_length, wvn, zx, vzx, soft_depth_sensitivity, render_size, y_weight);
 		
 		float neg_y_weight;
 
+		// get the foreground weight in the opposite direction
 		vec4 neg_y_sample = sample_y_velocity(x, neg_t, vn, vn_length, wvn, zx, vzx, soft_depth_sensitivity, render_size, neg_y_weight);
 
+		// blend blur given current direction weights, and opposite direction midground weights for optimistic blurring.
 		blend_blur(base_color, x_sample, x_weight, x_back_weight, neg_x_sample, neg_x_weight, y_sample, y_weight, sum, color_weight, alpha_weight);
 
+		// blend blur given opposite direction weights, and current direction midground weights for optimistic blurring.
 		blend_blur(base_color, neg_x_sample, neg_x_weight, neg_x_back_weight, x_sample, x_weight, neg_y_sample, neg_y_weight, sum, color_weight, alpha_weight);
 	}
 
