@@ -294,6 +294,7 @@ void main() {
 
 	imageStore(vector_output, uvi, final_output);
 
+// Ignore
 #ifdef DEBUG
 	imageStore(debug_2_image, uvi, vec4(texelFetch(depth_sampler, uvi, 0).x * 5));
 	imageStore(debug_3_image, uvi, vec4(-sampled_velocity, 0.0, 0.0));

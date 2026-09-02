@@ -21,6 +21,7 @@ Table of contents:
         - [Tile Max Y Stage](#tile-max-y-stage)
         - [Neighbor Max Stage](#neighbor-max-stage)
         - [Motion Blur Stage](#motion-blur-stage)
+- [**Sources**](#sources)
 
 ## Guide
 
@@ -42,31 +43,27 @@ Disclaimer: You can skip this section and jump straight to **Technical Overview*
 
 A few years back the Godot development team reached out to the community to create a workgroup that would develop Godot's motion blur.
 
-I enjoy the world of graphics programming, and with little experience and a lot of confidence, marched in to what I know today was a way-over-my-head task.
+I was already very interested in graphics programming so with limited experience I joined the task force.
 
-It was fun, don't get me wrong, but I simply was not equipped to be able to produce something that I could say Godot deserved.
+I ended up finding a cool way to dilate dominant velocities for motion blur, and sadly fixated on it for way too long. Later I realized that velocity dilation is far from what makes a motion blur effect great.
 
-I ended up finding a cool way to dilate velocities for motion blur, and fixated on it for way too long. Only later did I realize that velocity dilation is far from the only thing that makes a motion blur effect great.
+I then compiled a few different motion blur implementations for godot together to create the very messy [JFA driven motion blur addon](https://github.com/sphynx-owner/JFA_driven_motion_blur_addon) repository.
 
-Combine that with a relatively limited understanding of Godot (and programming in general), and you have the disasterously messy repository that's the [JFA driven motion blur addon](https://github.com/sphynx-owner/JFA_driven_motion_blur_addon) repo.
+It was pretty popular and is still a go to for people who want to add motion blur in their Godot projects.
 
-Nevertheless, it was pretty popular and is still a go to for people who want to add motion blur in their Godot projects.
+A year or so pass, and efforts to add the motion blur natively to Godot were rejuvinated. People volunteered and needed a reference to work with and migrate natively into Godot.
 
-A year or so pass, and efforts to add the motion blur natively to Godot were rejuvinated. This time it was serious, people were volunteering to take on it, and were asking technical questions.
+The existing motion blur repository was not approachable for that purpose, so with limited time I compiled the [godot motion blur addon simplified](https://github.com/sphynx-owner/godot-motion-blur-addon-simplified) repository.
 
-The existing motion blur repository was not approachable for someone wanting to port it into the engine, so with the little time I had, I compiled the [godot motion blur addon simplified](https://github.com/sphynx-owner/godot-motion-blur-addon-simplified) repo.
+It was an improvement over the previous repo, cleaned up, fat trimmed, and only contained the desired motion blur pipeline. However, it could have been better. [**@HydrogenC**](https://github.com/HydrogenC) and [**@DaveTheEggMan**](https://github.com/DaveTheEggman) rolled with it and created an amazing native Godot implementation of it in [this PR](https://github.com/godotengine/godot/pull/115027).
 
-It was a big improvement over the previous, more popular repo. The older repo was bloated with multiple motion blur methods that were not of interest, and everything was very ad-hoc, making it impossible to extract a coherent implementation out of.
+Due to my limited time I could not focus as much as I would have liked on polishing the effect, so when the time came to consider merging it, it fell short.
 
-This new repository was cleaned up, fat trimmed, and only contained the desired motion blur pipeline. But it could have been better. Still, [**@HydrogenC**](https://github.com/HydrogenC) and [**@DaveTheEggMan**](https://github.com/DaveTheEggman) rolled with it and created an amazing native Godot implementation of it in [this PR](https://github.com/godotengine/godot/pull/115027).
+Recently, however, I was able to allocate the appropriate time and effort to this project.
 
-Due to lack of time I could not focus as much as I would have liked on polishing the effect, so when the time came to consider merging it, it fell short.
+Over the past few weeks I've developed a suite of tools to help iterate, benchmark, and showcase the motion blur with relative ease.
 
-I now have some time, and this addon is the result.
-
-Over the past few weeks I've developed a suite of tools to help me iterate on, benchmark, and showcase the motion blur with repeatability, reliability, and convenience.
-
-The fruits of my labor have already payed off, and I was able to polish and optimize the effect further.
+At the time of writing this, the motion blur is nearly unrecognizable compared to when I started. Better in many ways.
 
 This repo aims to be a reference for engine maintainers in hopes of proving its feasibility as a native engine feature. If it does not end up achieving that, it could be the new-and-improved motion blur addon for Godot.
 
@@ -74,9 +71,14 @@ This repo aims to be a reference for engine maintainers in hopes of proving its 
 
 ### What Is Motion Blur
 
+I am not qualified to discuss real-world phenomenon like camera blur or the blur perceived by our eyes and brain. The definition I will go with is simple yet solid for our purposes:
+
 Motion blur is an artifact resulting from **the averaging of perceived light over a period of time**.
 
 <video controls src="readme_assets/blur_accumulation.mp4" title="Title"></video>
+
+The video above shows the process of averaging the scene's color over time as objects move through it, and the resulting emergence of motion blur as we know it.
+
 
 ### Real-Time Post-Process Motion Blur is Different
 
@@ -90,10 +92,10 @@ Let's say this is our input (the cube is moving to the left):
 
 The way this motion blur works can be separated into 3 distinct-yet-complementary layers:
 
-1. ***Smearing the current object's color*** - Using the velocities directly written by the current object, we can scavange for similar depth objects that match in velocity (which will most of the time be pixels from the same object), and avegrage the current object's color using them. Since it's using the object's velocities, it's confined to the current object's silhouette.
+1. ***Smearing the current object's color*** - Using the velocities directly written by the current object, we can scavange for similar-depth pixels that match in velocity, assume they belong to the same current object, and avegrage the color using them. Since it's using the object's velocities, it's confined to the current object's silhouette.
 ![alt text](readme_assets/playground_midground_only.png)
 
-1. ***faking the current object's transparency*** - Using the velocities directly written by the current object we can also scavange for background geometry (geometry that's further from the camera than the current object), and collect color from it to create this sort of camoflaging effect. Since the object is at motion, and is going to be covered by the next layer, this usually goes unnoticed. This works especially well against simple backgrounds or backgrounds with geometry that flows with the motion. This stage is also confined to the object's silhouette.
+1. ***faking the current object's transparency*** - Using the velocities directly written by the current object we can also scavange for background geometry (geometry that's further from the camera than the current object), and collect color from it to create this sort of camouflaging effect. Since the object is at motion, and is going to be covered by the next layer, this usually goes unnoticed. This works especially well against simple backgrounds or backgrounds with geometry that flows with the motion. This stage is also confined to the object's silhouette.
 ![alt text](readme_assets/playground_background_only.png)
 
 2. ***Accepting the extended blur of other objects*** - This requires some form of velocity dilation, which extends dominant velocities in the velocity texture beyond their original silhouettes. The dilated velocities are then used to "search" for objects that match in their velocity and are closer to the camera than the current object. We then blur these objects onto the current object. In this example, the back wall sees dominant velocities from the cube, and collects color from it onto itself.
@@ -159,7 +161,7 @@ But it should **never** be done.
 
 This has been a pitfall I was trapped in when I first started developing the motion blur effect. It made sense as blur appeared to "overshoot" less that way.
 
-But the cost of committing to backwards blurring revealed to dwarf the trajectory-estimation accuracy benefit.
+But the costs of committing to backwards blurring revealed to dwarf the trajectory-estimation accuracy benefit.
 
 Here are the crucial benefits that make centered blurring non-negotiable:
 
@@ -229,7 +231,7 @@ The pipeline uses Godot's depth, color and velocity textures, and 4 additional c
 
 ### Pre Processing Stage
 
-The implementation of this stage can be found in [pre_blur_processor.glsl](<addons\godot-motion-blur\pre_blur_processing\shader_stages\pre_blur_processor.glsl>).
+The implementation of this stage with detailed comments throughout can be found in [pre_blur_processor.glsl](<addons\godot-motion-blur\pre_blur_processing\shader_stages\pre_blur_processor.glsl>).
 
 #### Purpose
 
@@ -244,203 +246,6 @@ In the current implementation, this stage is also in charge of other nice-to-hav
 * It clamps velocities' length to be no larger than the span of 2 tiles.
 * It repurposes the code that generates velocities for background pixels to also generate Z velocities (in view space) for static environment, and stores them in the blue channel.
 * It stores depth in the alpha channel to be used with the generated Z velocities (one less texture sampling on the motion blur stage).
-
-#### Implementation Walkthrough
-
-Godot provides scene information buffers that we can use inside compute shaders. Their struct starts like this.
-
-```glsl
-struct SceneData {
-    mat4 projection_matrix;
-    mat4 inv_projection_matrix;
-    mat3x4 inv_view_matrix;
-    mat3x4 view_matrix;
-.
-.
-.
-```
-
-A key detail is that we get a similar struct containing information from the *previous frame*.
-
-```glsl
-layout(set = 0, binding = 3, std140) uniform SceneDataBlock {
-	SceneData data;
-	SceneData prev_data;
-}
-scene;
-```
-
-Using Godot's depth texture and the matrices in the scene data, we can convert the depth and UV of a pixel into a view position.
-
-```glsl
-float depth = texelFetch(depth_sampler, uvi, 0).x;
-
-vec4 view_position = scene_data.inv_projection_matrix * vec4(uv_to_ndc(uvn), depth, 1.0);
-
-view_position.xyz /= view_position.w;
-```
-We derive a current_uv which we can compare against our manually extracted UVs.
-
-```glsl
-vec3 current_uv = vec3(uvn, depth);
-```
-
-We take the view position, transform it to a world position, and then back to a view position using the *previous view matrix*, resulting in an estimation of where the pixel was last frame in view space. This estimation only works for static environment. It breaks for moving objects.
-
-```glsl
-mat4 inv_view_matrix = view_mat3x4_to_mat4(scene_data.inv_view_matrix);
-
-vec4 world_position = inv_view_matrix * vec4(view_position.xyz, 1.0);
-
-mat4 prev_view_matrix = view_mat3x4_to_mat4(previous_scene_data.view_matrix);
-
-vec4 view_past_position = prev_view_matrix * vec4(world_position.xyz, 1.0);
-```
-
-We extract a UV and depth change.
-
-```glsl
-vec4 view_past_ndc = previous_scene_data.projection_matrix * view_past_position;
-
-view_past_ndc.xyz /= view_past_ndc.w;
-
-vec3 past_uv = vec3(ndc_to_uv(view_past_ndc.xy), view_past_ndc.z);
-
-vec4 view_past_ndc_cache = view_past_ndc;
-
-vec3 camera_uv_change = past_uv - current_uv;
-```
-
-We do a similar process, but this time only using the rotation part of the view matrices, resulting in the part of the UV change that was caused by the rotation between frames.
-
-```glsl
-world_position = mat4(mat3(inv_view_matrix)) * vec4(view_position.xyz, 1.0);
-
-view_past_position = mat4(mat3(prev_view_matrix)) * vec4(world_position.xyz, 1.0);
-
-view_past_ndc = previous_scene_data.projection_matrix * view_past_position;
-
-view_past_ndc.xyz /= view_past_ndc.w;
-
-past_uv = vec3(ndc_to_uv(view_past_ndc.xy), view_past_ndc.z);
-
-vec3 camera_rotation_uv_change = past_uv - current_uv;
-```
-
-By subtracting the rotation part of the UV change from the total UV change, we can arrive at the UV change that was cause by the camera's movement.
-
-```glsl
-vec3 camera_movement_uv_change = camera_uv_change - camera_rotation_uv_change;
-```
-
-Get a velocity sample
-
-```glsl
-vec2 sampled_velocity = texelFetch(vector_sampler, uvi, 0).xy;
-```
-
-FSR2 alters the velocity buffer in a very specific way:
-
-1. Static geometry has its velocity replaced with a vec2(-1).
-2. Around the edges of moving geometry there are some pixels that have their velocities *divided by 2* and then added a vec2(-0.5).
-
-The following code attempts to account for that, but it would  fail if valid velocities happen to land on these looked-for edge cases.
-
-```glsl
-if (params.support_fsr2 > 0.5) {
-    if (sampled_velocity == vec2(-1)) {
-        sampled_velocity = camera_uv_change.xy;
-    }
-
-    vec2 potential_replacement = (sampled_velocity + 0.5) * 2.0;
-
-    if (dot(potential_replacement, potential_replacement) < dot(sampled_velocity, sampled_velocity)) {
-        sampled_velocity = potential_replacement;
-    }
-}
-```
-
-In Godot, background and skyboxes do not write to the velocity buffer. However, our manually-extracted UV change uses the view-matrices and the depth buffer to generate equivalent velocities, and it works even when the depth is 0 (infinity/background). Assuming the skybox is always static (does not move on its own), the value we extracted can serve as the ground truth. We set the base velocity to that of the manually extracted vectors, and keep it if the depth is 0 (background depth). It's not currently possible, but in the future you may be able to write to the veolcity buffer without writing to the depth buffer, so I'm checking for non-zero velocity as well just to be safe.
-
-```glsl
-vec3 base_velocity = camera_uv_change;
-
-if (dot(sampled_velocity * render_size, sampled_velocity * render_size) > PIXEL_RADIUS_SQUARED || depth > 0)
-{
-    base_velocity.xy = sampled_velocity;
-}
-```
-
-By subtracting the "original" UV change stored on base_velocity from the manuall-derived camera UV change, we end up with the UV change that was caused by the object's motion
-
-```glsl
-vec3 object_uv_change = base_velocity - camera_uv_change;
-```
-
-Now that we have the 3 components that make the original motion vectors isolated, we can put them back together after tuning them however we like. We assume that component magnitudes are between 0 and 1. This must be enforced on the editor interface level.
-
-```glsl
-vec3 total_velocity = camera_rotation_uv_change * params.rotation_velocity_multiplier + camera_movement_uv_change * params.movement_velocity_multiplier + object_uv_change * params.object_velocity_multiplier;
-```
-
-If depth == 0 (skybox), or the objcet is not static (has some object uv change), clear z velocity. The z velocity was manually extracted using view matrices and thus can only be safely assumed for static environment. In the case of background pixels, it does not make much sense for them to have "depth velocity". In addition, the depth velocity of the background is very saturated since it's a point at infinity that covers large distances easily, and I worry about noise it might introduce.
-
-```glsl
-if (depth == 0 || dot(object_uv_change.xy, object_uv_change.xy) > 0.000001) {
-    total_velocity.z = 0;
-    base_velocity.z = 0;
-}
-```
-
-This is a heuristic I came up with. Simply scaling down individual components of the original velocity can yield unintuivite results if those components are large but cancel out. For example, if a camera is following a speeding car, that car appears stationary in the camera's view, and so it's original velocity is small or zero. However under the hood that velocity is comprized of a very large object movement component on the car, cancelled out by the movement component of the camera that follows it. In that scenario, turning off just the object movement component would uncover that hidden camera movment component, and we would see the car start blurring more instead of less. The solution I stumbled across when trying to solve this issue has proven to be more robust than expected. The rule of thumb is that users that configure these velocity multipliers expect to REDUCE one or more aspects that otherwise trigger motion blur. So intuitively, the final velocity that decides the motion blur amount should be reduced or kept the same as the original velocity. Now, if all multipliers are set to lower than 1, we can  adjust our expectations and say that we expect the final velocity to be no larger than the largest configured multiplier multiplied by the original velocity. So if we have 0.2 object movment, 0.4 camera movement, and 0.1 camera rotation, we should not see any velocity that's larger than 0.4 of the original velocity.
-
-```glsl
-float max_component_multiplier = max(params.rotation_velocity_multiplier, max(params.movement_velocity_multiplier, params.object_velocity_multiplier));
-
-vec3 fallback_velocity = base_velocity * max_component_multiplier;
-
-if (length(total_velocity.xy) > length(fallback_velocity.xy)) {
-    total_velocity = fallback_velocity;
-}
-```
-
-Here is where we apply the velocity thresholds, customized by the user.
-
-```glsl
-total_velocity *= sharp_step(
-    params.velocity_lower_threshold,
-    params.velocity_upper_threshold,
-    length(total_velocity.xy)
-);
-```
-
-If the previous position is happening behind the camera, which can happen when the camera moves backwards at high speed, the w component of the projected vector would be negative, and the velocity vector would be flipped. This happens with Godot's native motion vectors as well. We can detect this and flip them back, avoiding crazy artifacts.
-
-```glsl
-total_velocity.xy = total_velocity.xy * render_size * (view_past_ndc_cache.w < 0 ? -1 : 1);
-```
-
-Now we clamp the velocity magnitudes to the tile size. This is a pretty important step that greatly improves stability and robustness. We mutliply the tile size by 2 here, because we blur the velocity symmetrically forwards and backwards, so it's radius is half its magnitude.
-
-```glsl
-float clamp_size = params.tile_size * 2;
-
-clamp_length(total_velocity, total_velocity.xy, clamp_size);
-```
-
-Here is where the intensity parameter is applied, customized by the user. The reason it is applied here after all the clamping, and not earlier, is that it makes intuitive sense to be the final say on how the blur looks. When applied earlier, it may be weird for users to see nothing change until the intensity is low enough for clamping to not be saturated.
-
-```glsl
-total_velocity *= params.motion_blur_intensity;
-```
-
-total_velocity up to this point was backwards, because it was derived using UV differences, which were vectors pointing to the previous UV, meaning the velocity of the pixel is in the other direction.
-
-```glsl
-vec4 final_output = vec4(-total_velocity, depth);
-
-imageStore(vector_output, uvi, final_output);
-```
 
 ### Tile Max X Stage
 
@@ -492,52 +297,16 @@ if(is_diagonal && !can_reach_tile)
     continue;
 }
 ```
+
 ![alt text](readme_assets/neighbor_max_diagonal_discarding.gif)
+
 ### Motion Blur Stage
 
-The implementation of this stage can be found in [guertin_sphynx_blur.glsl](<addons\godot-motion-blur\guertin\shader_stages\guertin_sphynx_blur.glsl>).
+The implementation of this stage with detailed comments throughout can be found in [guertin_sphynx_blur.glsl](<addons\godot-motion-blur\guertin\shader_stages\guertin_sphynx_blur.glsl>).
 
 #### Purpose
 
 This stage generates the motion blur.
-
-#### Implementation Walkthrough
-
-##### The functions
-
-###### soft_compare
-
-```glsl
-float soft_compare(float a, float b, float sze) {
-	return clamp(sze * (a - b), 0, 1);
-}
-```
-
-This funciton is a soft step function with variable softness. It's used to compare depth values, the softness helps keeping changes in depth-affected behavior seamless.
-
-###### cone
-
-```glsl
-float cone(float a, float b, float sze) {
-	return clamp(1 - sze * abs(a - b), 0, 1);
-}
-```
-
-This function complements `soft_compare`, and serves a similar purpose. It starts at 1 with the two depths being equal, and becomes smaller the further apart the depths are.
-
-###### interleaved_gradient_noise
-
-```glsl
-float interleaved_gradient_noise(vec2 uv) {
-	uv += float(params.frame) * 5.588238;
-
-	vec3 magic = vec3(0.06711056, 0.00583715, 52.9829189);
-
-	return fract(magic.z * fract(dot(uv, magic.xy)));
-}
-```
-
-This is an industry-standard noise fetched from 
 
 ## Sources
 
@@ -546,3 +315,9 @@ This is an industry-standard noise fetched from
 2. [demofox's blog discussing interleaved gradient noise](https://blog.demofox.org/2022/01/01/interleaved-gradient-noise-a-different-kind-of-low-discrepancy-sequence/)
 
 3. [keyjiro's KinoMotion repo](https://github.com/keijiro/KinoMotion)
+
+4. [JFA driven motion blur addon](https://github.com/sphynx-owner/JFA_driven_motion_blur_addon)
+
+5. [godot motion blur addon simplified](https://github.com/sphynx-owner/godot-motion-blur-addon-simplified)
+
+6. [this PR](https://github.com/godotengine/godot/pull/115027)

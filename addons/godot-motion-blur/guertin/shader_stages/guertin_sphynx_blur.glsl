@@ -8,6 +8,9 @@
 #define PIXEL_RADIUS_SQUARED 0.25
 
 // At depth difference of 1 / SOFT_DEPTH_SENSITIVITY the velocity weights are saturated.
+// Arrived at via experimentation, larger values mean stronger sensitivity to depth, 
+// and potential double-blurring of the same object yielding unwanted and obvious harsh colors.
+// Smaller values means smoother but weaker blur between close geometry.
 #define SOFT_DEPTH_SENSITIVITY 10
 
 
@@ -89,7 +92,7 @@ vec4 sample_x_velocity(
 		return vec4(0);
 	}
 	
-	// We sample at the position.
+	// We sample velocity and depth data at the position.
 	vec4 syx = texelFetch(velocity_sampler, yx, 0);
 
 	// The UV velocity at the sample position.
@@ -107,17 +110,16 @@ vec4 sample_x_velocity(
 	// get a z-velocity-aware depth estimate of the current pixel
 	float x_depth = zx + vzx * t;
 
-	// get the depth similarity
-	float soft_overlap_x = cone(x_depth, zyx, soft_depth_sensitivity);
-
-	// derive the midground weight. It's defined by
-	// how close in depth the found pixel is, and if it's velocity would reach the current pixel.
-	x_weight = soft_overlap_x * reaches_weight;
+	// derive the midground weight (smear the current object's color). It's defined by
+	// how similar in depth the found pixel is, and if it's velocity would reach the current pixel.
+	x_weight = cone(x_depth, zyx, soft_depth_sensitivity) * reaches_weight;
 
 	// whether the sampled pixel is behind the current pixel
 	float overlap_x = soft_compare(x_depth, zyx, soft_depth_sensitivity);
 
-	x_back_weight = overlap_x;
+	// derive the background weight (fake transparency). It's defined by
+	// whether the sampled pixel is behind the current pixel (part of the background relatievly)
+	x_back_weight = soft_compare(x_depth, zyx, soft_depth_sensitivity);
 	
 	return texelFetch(color_sampler, yx, 0);
 }
@@ -144,7 +146,7 @@ vec4 sample_y_velocity(
 		return vec4(0);
 	}
 
-	// We sample at the position.
+	// We sample velocity and depth data at the position.
 	vec4 syn = texelFetch(velocity_sampler, yn, 0);
 
 	// The UV velocity at the sample position.
@@ -175,11 +177,11 @@ vec4 sample_y_velocity(
 	// get the distance to the sampled pixel.
 	float vn_distance = abs(t * vn_length);
 
-	// y_weight is determined by:
+	// derive the foreground weight (foreground  dominant-velocity object's blur onto us). It's determined by:
 	// 1. If the found velocity reach over to this pixel.
-	// 2. If the depth at the sampled pixel in front of the current one.
-	// 3. An additional offset that handles when the neighbor_max velocity is larger than the found velocity
-	// to counteract the resulting opacity dilution.
+	// 2. If the depth at the sampled pixel in front of the current one (foreground relatively).
+	// 3. An additional bias that handles when the neighbor_max velocity is larger than the found velocity
+	// to counter-act the opacity dilution resulting from fewer samples.
 	y_weight = step(vn_distance, abs(dot(vyn * 0.5, wvn))) * y_in_front * max(1.05, pow(vn_length / vyn_length, 0.5));
 
 	return texelFetch(color_sampler, yn, 0);
@@ -202,21 +204,19 @@ void blend_blur(
 	float current_weight_x = max(x_weight, neg_x_weight);
 
 	// We get an optimistic midground color value
-	// TODO @sphynx-owner: figure out a better heuristic to choosing a value. If the weight cannot be larger than
-	// 1, we can simply get the difference between the negative weight and the regular weigth, clamping it between 0 and 1.
-	// this needs to be thoroughly tested.
+	// TODO @sphynx-owner: see if there's a better heuristic to choosing this value.
 	vec4 x_color_sample = mix(neg_x_sample, x_sample, clamp(x_weight / neg_x_weight, 0, 1));
 
-	// We compose the midground, background, and foreground samples based on their weight. Midground is the baseline, on top of it is applied the background, or the "fake transparency", at the top is the dominant-velocity-object blur.
+	// We compose the midground, background, and foreground samples based on their weights. Midground (object color smear) is the baseline, on top of it is applied the background (faked transparency), at the top is the foreground (dominant-velocity object's blur over us).
 	vec4 current_color = mix(mix(mix(base_color, x_color_sample, current_weight_x), x_sample, x_back_weight), y_sample, y_weight);
 
-	// current_color_weight enables custom support for transparent background.
+	// current_color_weight enables custom support for transparent background. This is relevant for SubViewports.
 	float current_color_weight = max(current_color.a, 1 - params.transparent_bg);
 
 	// accumulate into the color sum
 	color_sum += vec4(current_color.rgb * current_color_weight, current_color.a);
 
-	// accumulate into th ecolor weight
+	// accumulate into the color weight
 	color_weight += current_color_weight;
 
 	// color_weight would have been += 1 too but we want
@@ -240,20 +240,20 @@ void main() {
 	// x is the pixel we will start sampling from.
 	ivec2 x = uvi;
 
-	// get the pixel to sample from the neighbor_max texture.
-	ivec2 neighbor_max_uvi = (x + jitter_tile(x)) / params.tile_size;
-
-	// We get the neighbor-max velocity for the tile we are in, with some jitter to hide the seams.
-	vec2 vn = texelFetch(neighbor_max, neighbor_max_uvi, 0).xy;
-
-	// We get data at the current pixel
+	// We get velocity and depth data at the current pixel
 	vec4 sx = texelFetch(velocity_sampler, x, 0);
 
 	// UV velocity data
 	vec2 vx = sx.xy;
 
-	vec4 base_color = texelFetch(color_sampler, x, 0);
+	// get the target neighbor_max tile (pixel) to sample from, add jitter between tiles
+	// to hide the seams.
+	ivec2 neighbor_max_uvi = (x + jitter_tile(x)) / params.tile_size;
 
+	// We get the neighbor-max velocity.
+	vec2 vn = texelFetch(neighbor_max, neighbor_max_uvi, 0).xy;
+
+// Ignore
 #ifdef DEBUG
 	float t = 1;
 
@@ -280,6 +280,9 @@ void main() {
 	imageStore(debug_12_image, uvi, vec4(result));
 #endif
 
+	// color at the current pixel
+	vec4 base_color = texelFetch(color_sampler, x, 0);
+
 	// We must account for cases where the dominant velocity is 0 even though
 	// The current velocity is not. This is only the case for the skybox, which
 	// Will never overlap geometry so it can safely be ignored when calculating neighbor_max
@@ -287,7 +290,8 @@ void main() {
 	if(dot(vn, vn) < PIXEL_RADIUS_SQUARED && dot(vx, vx) < PIXEL_RADIUS_SQUARED)
 	{
 		imageStore(output_color, uvi, base_color);
-		
+
+// Ignore
 #ifdef DEBUG
 		imageStore(debug_8_image, uvi, vec4(vn / render_size, uvi.x % params.tile_size == 0 || uvi.y %params.tile_size == 0 ? 1.0 : 0.0, 0.0));
 		imageStore(debug_1_image, uvi, base_color);
@@ -300,7 +304,7 @@ void main() {
 	// Length of neighbor_max velocity
 	float vn_length = length(vn);
 
-	// We normalize neighbor-max velocity
+	// normalized neighbor-max velocity
 	vec2 wvn = vn / vn_length;
 
 	// Length of current pixel's velocity
@@ -316,19 +320,21 @@ void main() {
 	// Get z velocity at current pixel
 	float vzx = sx.z;
 
-	// We generate a depth sensitivity based on the depth of the current pixel. The further it is away, the closer to 0 the depth would be, and thus the greater the sensitivity.
+	// We determine a depth sensitivity dynamically based on the depth of the current pixel. 
+	// The further it is away, the closer to 0 the depth value would be, and thus the greater the sensitivity.
 	float soft_depth_sensitivity = SOFT_DEPTH_SENSITIVITY / max(SMALL_EPSILON, zx);
 
-	// Get a sample jitter value
-	float j = interleaved_gradient_noise(uvi);
+	// Get a jitter value
+	float j = interleaved_gradient_noise(x);
 
 	float color_weight = EPSILON;
 
 	float alpha_weight = EPSILON;
 
-	// Create an initial color sum
+	// Create an initial color sum to avoid division-by-0 errors.
 	vec4 sum = vec4(base_color.rgb * base_color.a * color_weight, base_color.a * alpha_weight);
 
+	// Slight optimization to not divide every iteration
 	float inv_sample_count = 1.0 / params.sample_count;
 
 	for(int i = 0; i < params.sample_count; i++)
@@ -336,7 +342,7 @@ void main() {
 		// time offset
 		float t = mix(0, 0.5, float(i + j) * inv_sample_count);
 		
-		// opposite time offset
+		// opposing time offset
 		float neg_t = mix(0, -0.5, float(i + 1 - j) * inv_sample_count);
 
 		float x_weight;
@@ -350,23 +356,23 @@ void main() {
 
 		float neg_x_back_weight;
 
-		// get the midground and background weights in the opposite direction
+		// get the midground and background weights in the opposing direction
 		vec4 neg_x_sample = sample_x_velocity(x, neg_t, vx, vx_length, wvx, zx, vzx, soft_depth_sensitivity, render_size, neg_x_weight, neg_x_back_weight);
 
 		float y_weight;
 
-		// get the foreground weight (dominant object to blur over us)
+		// get the foreground weight (dominant-velocity object to blur over us)
 		vec4 y_sample = sample_y_velocity(x, t, vn, vn_length, wvn, zx, vzx, soft_depth_sensitivity, render_size, y_weight);
 		
 		float neg_y_weight;
 
-		// get the foreground weight in the opposite direction
+		// get the foreground weight in the opposing direction
 		vec4 neg_y_sample = sample_y_velocity(x, neg_t, vn, vn_length, wvn, zx, vzx, soft_depth_sensitivity, render_size, neg_y_weight);
 
-		// blend blur given current direction weights, and opposite direction midground weights for optimistic blurring.
+		// blend blur given current-direction weights, and opposing-direction midground weights for optimistic smearing.
 		blend_blur(base_color, x_sample, x_weight, x_back_weight, neg_x_sample, neg_x_weight, y_sample, y_weight, sum, color_weight, alpha_weight);
 
-		// blend blur given opposite direction weights, and current direction midground weights for optimistic blurring.
+		// blend blur given opposing-direction weights, and current-direction midground weights for optimistic smearing.
 		blend_blur(base_color, neg_x_sample, neg_x_weight, neg_x_back_weight, x_sample, x_weight, neg_y_sample, neg_y_weight, sum, color_weight, alpha_weight);
 	}
 
@@ -375,6 +381,7 @@ void main() {
 
 	imageStore(output_color, uvi, sum);
 
+// Ignore
 #ifdef DEBUG
 	imageStore(debug_8_image, uvi, vec4(vn / render_size, uvi.x % params.tile_size == 0 || uvi.y %params.tile_size == 0  ? 1.0 : 0.0, 0.0));
 	imageStore(debug_1_image, uvi, base_color);
