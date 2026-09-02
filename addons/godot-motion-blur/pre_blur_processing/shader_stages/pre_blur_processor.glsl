@@ -195,7 +195,7 @@ void main() {
 	// FSR2 alters the velocity buffer in a very specific way:
 	// 1. Static geometry has its velocity replaced with a vec2(-1).
 	// 2. Around the edges of moving geometry there are some pixels that have their velocities *divided by 2* and then added a vec2(-0.5).
-	// The following code attempts to account for that, but it would 
+	// The following code attempts to account for that, but it would
 	// fail if valid velocities happen to land on these looked-for edge cases.
 	if (params.support_fsr2 > 0.5) {
 		if (sampled_velocity == vec2(-1)) {
@@ -245,13 +245,13 @@ void main() {
 	// a speeding car, that car appears stationary in the camera's view, and so it's original velocity is small or zero.
 	// However under the hood that velocity is comprized of a very large object movement component on the car, cancelled out
 	// by the movement component of the camera that follows it. In that scenario, turning off just the object movement component would
-	// uncover that hidden camera movment component, and we would see the car start blurring more instead of less.
+	// uncover that hidden camera movement component, and we would see the car start blurring more instead of less.
 	// The solution I stumbled across when trying to solve this issue, has proven to be more robust than expected.
 	// The rule of thumb is that users that configure these velocity multipliers expect to REDUCE one or more aspects
 	// that otherwise trigger motion blur. So intuitively, the final velocity that decides the motion blur amount should
 	// be reduced or kept the same as the original velocity. Now, if all multipliers are set to lower than 1, we can 
 	// adjust our expectations and say that we expect the final velocity to be no larger than the largest configured multiplier multiplied
-	// by the original velocity. So if we have 0.2 object movment, 0.4 camera movement, and 0.1 camera rotation, we should not
+	// by the original velocity. So if we have 0.2 object movement, 0.4 camera movement, and 0.1 camera rotation, we should not
 	// see any velocity that's larger than 0.4 of the original velocity.
 	// ---------------------------------------------------
 	float max_component_multiplier = max(params.rotation_velocity_multiplier, max(params.movement_velocity_multiplier, params.object_velocity_multiplier));
@@ -277,7 +277,7 @@ void main() {
 	total_velocity.xy = total_velocity.xy * render_size * (view_past_ndc_cache.w < 0 ? -1 : 1);
 
 	// Now we clamp the velocity magnitudes to the tile size. This is a pretty important step that greatly
-	// improves stability and robustness. We mutliply the tile size by 2 here, because we blur the velocity
+	// improves stability and robustness. We multiply the tile size by 2 here, because we blur the velocity
 	// symmetrically forwards and backwards, so it's radius is half its magnitude.
 	// NOTE @sphynx-owner: this clamp also handles the asymptotical behavior of near-clip-plane previous positions' velocities.
 	// ---------------------------------------------------

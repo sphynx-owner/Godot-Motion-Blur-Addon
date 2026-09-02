@@ -118,7 +118,7 @@ vec4 sample_x_velocity(
 	float overlap_x = soft_compare(x_depth, zyx, soft_depth_sensitivity);
 
 	// derive the background weight (fake transparency). It's defined by
-	// whether the sampled pixel is behind the current pixel (part of the background relatievly)
+	// whether the sampled pixel is behind the current pixel (part of the background relatively)
 	x_back_weight = soft_compare(x_depth, zyx, soft_depth_sensitivity);
 	
 	return texelFetch(color_sampler, yx, 0);
@@ -320,7 +320,7 @@ void main() {
 	// Get z velocity at current pixel
 	float vzx = sx.z;
 
-	// We determine a depth sensitivity dynamically based on the depth of the current pixel. 
+	// We determine a depth sensitivity dynamically based on the depth of the current pixel.
 	// The further it is away, the closer to 0 the depth value would be, and thus the greater the sensitivity.
 	float soft_depth_sensitivity = SOFT_DEPTH_SENSITIVITY / max(SMALL_EPSILON, zx);
 
