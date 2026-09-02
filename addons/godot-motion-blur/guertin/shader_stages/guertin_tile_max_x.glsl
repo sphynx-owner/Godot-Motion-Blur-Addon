@@ -9,11 +9,7 @@ layout(rg8i, set = 0, binding = 1) uniform writeonly iimage2D tile_max_x;
 // DEBUG_UNIFORMS
 
 layout(push_constant, std430) uniform Params 
-{	
-	float nan5;
-	float nan6;
-	float nan7;
-	float nan8;
+{
 	int tile_size;
 	int nan2;
 	int nan3;
@@ -48,9 +44,9 @@ void main()
 
 		vec4 velocity_sample = texelFetch(velocity_sampler, current_uvi, 0);
 		
-		// If the depth at the potential dominant velocity is infinity (background or skybox)
+		// If the depth at the potential dominant velocity is 0 (background or skybox)
 		// then it will never go in front of other geometry, and can be skipped.
-		if(velocity_sample.w == (-1.0 / 0.0))
+		if(velocity_sample.w == 0)
 		{
 			continue;
 		}
@@ -65,8 +61,6 @@ void main()
 		}
 	}
 
-	// TODO @sphynx-owner: replace the buffer with a red-green buffer only,
-	// no need to store depth and z velocity here.
 	imageStore(tile_max_x, uvi, max_velocity);
 
 #ifdef DEBUG

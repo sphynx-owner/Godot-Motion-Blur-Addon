@@ -10,17 +10,6 @@ layout(set = 0, binding = 0) uniform isampler2D tile_max;
 layout(rg8i, set = 0, binding = 1) uniform writeonly iimage2D neighbor_max;
 // DEBUG_UNIFORMS
 
-layout(push_constant, std430) uniform Params 
-{	
-	float nan5;
-	float nan6;
-	float nan7;
-	float nan8;
-	int nan1;
-	int nan2;
-	int nan3;
-	int nan4;
-} params;
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 

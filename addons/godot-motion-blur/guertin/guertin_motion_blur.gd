@@ -71,11 +71,11 @@ func _enhanced_render_callback(render_size : Vector2i):
 		tile_size
 	])
 	
-	var tile_max_x_push_constants: PackedByteArray = get_push_constants([], [tile_size], true)
+	var tile_max_x_push_constants: PackedByteArray = get_push_constants([], [tile_size], false)
 	
-	var tile_max_y_push_constants: PackedByteArray = get_push_constants([], [tile_size], true)
+	var tile_max_y_push_constants: PackedByteArray = get_push_constants([], [tile_size], false)
 	
-	var neighbor_max_push_constants: PackedByteArray = get_push_constants([], [], true)
+	var neighbor_max_push_constants: PackedByteArray = get_push_constants([], [], false)
 	
 	var blur_push_constants: PackedByteArray = get_push_constants(
 		[],

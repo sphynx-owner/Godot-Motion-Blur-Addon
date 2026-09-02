@@ -9,11 +9,7 @@ layout(rg8i, set = 0, binding = 1) uniform writeonly iimage2D tile_max;
 // DEBUG_UNIFORMS
 
 layout(push_constant, std430) uniform Params 
-{	
-	float nan5;
-	float nan6;
-	float nan7;
-	float nan8;
+{
 	int tile_size;
 	int nan2;
 	int nan3;
