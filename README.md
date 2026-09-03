@@ -75,9 +75,9 @@ I am not qualified to discuss real-world phenomenon like camera blur or the blur
 
 Motion blur is an artifact resulting from **the averaging of perceived light over a period of time**.
 
-<video controls src="readme_assets/blur_accumulation.mp4" title="Title"></video>
+[![alt text](readme_assets/blur_accumulation.gif)](readme_assets/blur_accumulation.mp4)
 
-The video above shows the process of averaging the scene's color over time as objects move through it, and the resulting emergence of motion blur as we know it.
+The gif above shows the process of averaging the scene's color over time as objects move through it, and the resulting emergence of motion blur as we know it.
 
 
 ### Real-Time Post-Process Motion Blur is Different
