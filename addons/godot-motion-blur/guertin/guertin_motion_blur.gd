@@ -66,7 +66,7 @@ func _enhanced_render_callback(render_size : Vector2i):
 		multiplier_object_movement,
 		velocity_threshold_lower / 100.0,
 		velocity_threshold_upper / 100.0,
-		support_fsr2,
+		_current_render_scene_buffers.get_scaling_3d_mode() == RenderingServer.ViewportScaling3DMode.VIEWPORT_SCALING_3D_MODE_FSR2,
 		temp_intensity,
 		tile_size
 	])
