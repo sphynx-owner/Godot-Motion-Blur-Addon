@@ -12,7 +12,7 @@ const COLOR_OUTPUT_TEXTURE : StringName = "color_output"
 @export_group("Motion Blur Parameters")
 
 # diminishing returns over 8
-@export_range(1, 64) var samples: int = 8
+@export_range(1, 64) var samples: int = 2
 
 # you really don't want this over 0.5, but you can if you want to try
 @export_range(0, 1.0, 0.001, "or_greater") var intensity: float = 1
