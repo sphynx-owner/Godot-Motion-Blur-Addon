@@ -276,6 +276,9 @@ void main() {
 	// crazy artifacts.
 	total_velocity.xy = total_velocity.xy * render_size * (view_past_ndc_cache.w < 0 ? -1 : 1);
 
+	// Here is where the intensity parameter is applied, customized by the user.
+	total_velocity *= params.motion_blur_intensity;
+
 	// Now we clamp the velocity magnitudes to the tile size. This is a pretty important step that greatly
 	// improves stability and robustness. We multiply the tile size by 2 here, because we blur the velocity
 	// symmetrically forwards and backwards, so it's radius is half its magnitude.
@@ -285,9 +288,6 @@ void main() {
 
 	clamp_length(total_velocity, total_velocity.xy, clamp_size);
 	// ---------------------------------------------------
-
-	// Here is where the intensity parameter is applied, customized by the user.
-	total_velocity *= params.motion_blur_intensity;
 
 	// total_velocity up to this point was backwards, because it was derived using UV differences, which were vectors
 	// pointing to the previous UV, meaning the velocity of the pixel is in the other direction.
