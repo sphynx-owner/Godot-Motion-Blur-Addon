@@ -111,9 +111,9 @@ layout(push_constant, std430) uniform Params {
 	float rotation_velocity_multiplier;
 	float movement_velocity_multiplier;
 	float object_velocity_multiplier;
-	float velocity_lower_threshold;
+	float velocity_threshold_lower;
 
-	float velocity_upper_threshold;
+	float velocity_threshold_upper;
 	float support_fsr2;
 	float motion_blur_intensity;
 	float tile_size;
@@ -273,7 +273,7 @@ void main() {
 	// the w component of the projected vector would be negative, and the velocity vector would be flipped.
 	// This happens with Godot's native motion vectors as well. We can detect this and flip them back, avoiding
 	// crazy artifacts.
-	total_velocity.xy *= sharp_step(params.velocity_lower_threshold, params.velocity_upper_threshold, length(total_velocity.xy)) * render_size * (view_past_ndc_cache.w < 0 ? -1 : 1) * params.motion_blur_intensity;
+	total_velocity.xy *= sharp_step(params.velocity_threshold_lower, params.velocity_threshold_upper, length(total_velocity.xy)) * render_size * (view_past_ndc_cache.w < 0 ? -1 : 1) * params.motion_blur_intensity;
 
 	// Now we clamp the velocity magnitudes to the tile size.
 	// We multiply the tile size by 2 because we blur the velocity

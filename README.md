@@ -229,7 +229,7 @@ The pipeline uses Godot's depth, color and velocity textures, and 4 additional c
 
 ### Pre Processing Stage
 
-The implementation of this stage with detailed comments throughout can be found in [pre_blur_processor.glsl](<addons\godot-motion-blur\pre_blur_processing\shader_stages\pre_blur_processor.glsl>).
+The implementation of this stage with detailed comments throughout can be found in [pre_blur_processor.glsl](<addons/godot-motion-blur/pre_blur_processing/shader_stages/pre_blur_processor.glsl>).
 
 #### Purpose
 
@@ -247,7 +247,7 @@ In the current implementation, this stage is also in charge of other nice-to-hav
 
 ### Tile Max X Stage
 
-The implementation of this stage can be found in [guertin_tile_max_x.glsl](<addons\godot-motion-blur\guertin\shader_stages\guertin_tile_max_x.glsl>).
+The implementation of this stage can be found in [guertin_tile_max_x.glsl](<addons/godot-motion-blur/guertin/shader_stages/guertin_tile_max_x.glsl>).
 
 #### Purpose
 
@@ -259,7 +259,7 @@ So in this stage we are really performing a *tile row max* pass.
 
 ### Tile Max Y Stage
 
-The implementation of this stage can be found in [guertin_tile_max_y.glsl](<addons\godot-motion-blur\guertin\shader_stages\guertin_tile_max_y.glsl>).
+The implementation of this stage can be found in [guertin_tile_max_y.glsl](<addons/godot-motion-blur/guertin/shader_stages/guertin_tile_max_y.glsl>).
 
 #### Purpose
 
@@ -267,7 +267,7 @@ Takes the resulting **tile max x** texture from the previous stage, and searches
 
 ### Neighbor Max Stage
 
-The implementation of this stage can be found in [guertin_neighbor_max.glsl](<addons\godot-motion-blur\guertin\shader_stages\guertin_neighbor_max.glsl>).
+The implementation of this stage can be found in [guertin_neighbor_max.glsl](<addons/godot-motion-blur/guertin/shader_stages/guertin_neighbor_max.glsl>).
 
 #### Purpose
 
@@ -298,7 +298,7 @@ if(is_diagonal && !can_reach_tile)
 
 ### Motion Blur Stage
 
-The implementation of this stage with detailed comments throughout can be found in [guertin_sphynx_blur.glsl](<addons\godot-motion-blur\guertin\shader_stages\guertin_sphynx_blur.glsl>).
+The implementation of this stage with detailed comments throughout can be found in [guertin_sphynx_blur.glsl](<addons/godot-motion-blur/guertin/shader_stages/guertin_sphynx_blur.glsl>).
 
 #### Purpose
 
