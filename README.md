@@ -4,6 +4,9 @@ The latest iteration of my motion blur implementation for godot, including a tec
 Table of contents:
 
 - [**Guide**](#guide)
+    - [Installation](#installation)
+    - [How To Use](#how-to-use)
+    - [Additional Features](#additional-features)
 
 - [**Background**](#background)
 
@@ -35,7 +38,54 @@ Table of contents:
 1. Add a **GuertinSphynxMotionBlur** compositor effect to your active compositor. It should start working right away.
 
 ### Additional Features
-To be written
+
+#### Motion Separation
+
+In the `multipliers` section in the inspector you will find 3 sliders: **Camera Rotation**, **Camera Movement**, and **Object Movement**.
+
+![alt text](readme_assets/motion_separation_settings.png)
+
+They let you control how much each of these movement types contributes to the motion blur.
+
+A common use of this feature is to lower **Camera Rotation** motion blur down to prevent nausia in players as they look around.
+
+#### Velocity Thresholds
+
+This feature allows you to keep slow-movements that players should be able to track with their eyes crisp, and only blur fast movements they are not expected to track.
+
+In the `velocity thresholds` section in the inspector you will find 2 sliders: **Lower** and **Upper**.
+
+![alt text](readme_assets/velocity_thresholds_settings.png)
+
+These allow you to establish speed thresholds below which objects stay unblurred, and when surpassed objects start getting blurred.
+
+The reason there are 2 thresholds, a lower and an upper, is to allow for a seamless transition between objects being unblurred and objects being fully blurred.
+
+Let's say your lower threshold is at 1, and your upper threshold is at 3. If an object lands on 1 or below, it is not blurred. If it lands on 2, it is half blurred, and if it lands on 3 or above, it is blurred fully.
+
+The threshold values are in screen width percentage, and are compared against the object's speed across the screen.
+
+Let's say you are moving left very fast, in front of you is a field of green pillars:
+
+![alt text](readme_assets/green_pillar_field_base.png)
+
+You can expect players to be able to track further pillars that visually move slower with their eyes, so let's use the velocity thresholds to only blur the fastest moving parts of the view.
+
+Let's start by setting both lower and upper thresholds to 5:
+
+![alt text](readme_assets/green_pillar_field_5_5.png)
+
+This is good progress, only the closer, fast-moving geometry is blurred, but we are still dealing with an obvious seam as both the lower and upper thresholds are on the same value, so objects are either unblurred or blurred fully, no in between.
+
+![alt text](readme_assets/green_pillar_field_zoom_5_5.png)
+
+Let's now set the lower threshold to 3, and the upper threshold to 7, so objects that land within that range gradually start getting blurred:
+
+![alt text](readme_assets/green_pillar_field_3_7.png)
+
+And the seam is gone.
+
+![alt text](readme_assets/green_pillar_field_zoom_3_7.png)
 
 ## Background
 
@@ -114,6 +164,7 @@ Godot provides us with a motion-vectors texture, and it's not without its caveat
 - Some render settings like enabling FSR2 drastically modify how these motion vectors behave.
 - As of now there are glitches with objects that are spawned in, and sharp direction changes of the camera movement.
 - If the camera moves backwards really fast along a surface, you can see velocity vectors that point to a position behind the camera's near clip plane. This leads to these velocities being flipped, and in addition results in asymptotical behavior the closer these previos positions are to the near clip plane.
+- The velocity texture is affected by antialiasing, producing interpolated (and broken) velocity values at the edges of geometry.
 
 I am solving some of these issues in this addon.
 
