@@ -36,9 +36,9 @@ func _enhanced_render_callback(render_size : Vector2i):
 		
 		temp_intensity = intensity * capped_frame_time / delta_time
 	
-	var max_x_size: Vector2i = divide_vector2i_by_tile_size(render_size, Vector2i(tile_size, 1))
+	var max_x_size: Vector2i = EasyRenderingUtils.divide_vector2i_by_tile_size(render_size, Vector2i(tile_size, 1))
 	
-	var neighbor_max_size: Vector2i = divide_vector2i_by_tile_size(render_size, Vector2i(tile_size, tile_size))
+	var neighbor_max_size: Vector2i = EasyRenderingUtils.divide_vector2i_by_tile_size(render_size, Vector2i(tile_size, tile_size))
 	
 	ensure_texture(
 		TILE_MAX_TEXTURE,
@@ -60,7 +60,7 @@ func _enhanced_render_callback(render_size : Vector2i):
 	
 	ensure_texture(COLOR_OUTPUT_TEXTURE)
 	
-	var pre_blur_push_constants: PackedByteArray = get_push_constants([
+	var pre_blur_push_constants: PackedByteArray = EasyRenderingUtils.get_push_constants([
 		multiplier_camera_rotation,
 		multiplier_camera_movement,
 		multiplier_object_movement,
@@ -71,13 +71,13 @@ func _enhanced_render_callback(render_size : Vector2i):
 		tile_size
 	])
 	
-	var tile_max_x_push_constants: PackedByteArray = get_push_constants([], [tile_size], false)
+	var tile_max_x_push_constants: PackedByteArray = EasyRenderingUtils.get_push_constants([], [tile_size], false)
 	
-	var tile_max_y_push_constants: PackedByteArray = get_push_constants([], [tile_size], false)
+	var tile_max_y_push_constants: PackedByteArray = EasyRenderingUtils.get_push_constants([], [tile_size], false)
 	
-	var neighbor_max_push_constants: PackedByteArray = get_push_constants([], [], false)
+	var neighbor_max_push_constants: PackedByteArray = EasyRenderingUtils.get_push_constants([], [], false)
 	
-	var blur_push_constants: PackedByteArray = get_push_constants(
+	var blur_push_constants: PackedByteArray = EasyRenderingUtils.get_push_constants(
 		[],
 		[
 			tile_size,
@@ -87,13 +87,13 @@ func _enhanced_render_callback(render_size : Vector2i):
 		]
 	)
 	
-	rd_instance.rd.draw_command_begin_label("Pre Blur Processing", Color(1.0, 1.0, 1.0, 1.0))
-	
 	var depth_image: RID = get_depth_texture()
 	
 	var custom_velocity_image: RID = get_texture(CUSTOM_VELOCITY_TEXTURE)
 	
-	var render_groups_count: Vector3i = get_groups_count(Vector3i(render_size.x, render_size.y, 1), DEFAULT_GROUP_SIZE)
+	var render_groups_count: Vector3i = EasyRenderingUtils.get_groups_count(Vector3i(render_size.x, render_size.y, 1), DEFAULT_GROUP_SIZE)
+	
+	begin_compute("Motion Blur")
 	
 	dispatch_stage(
 		pre_blur_processor_stage, 
@@ -104,13 +104,8 @@ func _enhanced_render_callback(render_size : Vector2i):
 			get_buffer_uniform(get_scene_uniform_data_buffer(), 3)
 		],
 		pre_blur_push_constants,
-		render_groups_count, 
-		"Process Velocity Buffer"
+		render_groups_count
 	)
-	
-	rd_instance.rd.draw_command_end_label()
-	
-	rd_instance.rd.draw_command_begin_label("Motion Blur", Color(1.0, 1.0, 1.0, 1.0))
 	
 	var color_image: RID = get_color_texture()
 	
@@ -120,7 +115,7 @@ func _enhanced_render_callback(render_size : Vector2i):
 	
 	var neighbor_max_image: RID = get_texture(NEIGHBOR_MAX_TEXTURE)
 	
-	var max_x_groups_count: Vector3i = get_groups_count(Vector3i(max_x_size.x, max_x_size.y, 1), DEFAULT_GROUP_SIZE)
+	var max_x_groups_count: Vector3i = EasyRenderingUtils.get_groups_count(Vector3i(max_x_size.x, max_x_size.y, 1), DEFAULT_GROUP_SIZE)
 	
 	dispatch_stage(
 		tile_max_x_stage, 
@@ -129,11 +124,12 @@ func _enhanced_render_callback(render_size : Vector2i):
 			get_image_uniform(neighbor_max_image, 1)
 		],
 		tile_max_x_push_constants,
-		max_x_groups_count, 
-		"TileMaxX"
+		max_x_groups_count
 	)
 	
-	var neighbor_max_groups_count: Vector3i = get_groups_count(
+	add_barrier()
+	
+	var neighbor_max_groups_count: Vector3i = EasyRenderingUtils.get_groups_count(
 		Vector3i(neighbor_max_size.x, neighbor_max_size.y, 1),
 		DEFAULT_GROUP_SIZE
 	)
@@ -145,9 +141,10 @@ func _enhanced_render_callback(render_size : Vector2i):
 			get_image_uniform(tile_max_image, 1)
 		],
 		tile_max_y_push_constants,
-		neighbor_max_groups_count, 
-		"TileMaxY"
+		neighbor_max_groups_count
 	)
+	
+	add_barrier()
 	
 	dispatch_stage(
 		neighbor_max_stage, 
@@ -156,9 +153,10 @@ func _enhanced_render_callback(render_size : Vector2i):
 			get_image_uniform(neighbor_max_image, 1)
 		],
 		neighbor_max_push_constants,
-		neighbor_max_groups_count, 
-		"NeighborMax"
+		neighbor_max_groups_count
 	)
+	
+	add_barrier()
 	
 	dispatch_stage(
 		blur_stage, 
@@ -169,9 +167,10 @@ func _enhanced_render_callback(render_size : Vector2i):
 			get_image_uniform(color_output_image, 3),
 		],
 		blur_push_constants,
-		render_groups_count, 
-		"Blur Reconstruction"
+		render_groups_count
 	)
+	
+	add_barrier()
 	
 	dispatch_stage(
 		overlay_stage, 
@@ -180,8 +179,7 @@ func _enhanced_render_callback(render_size : Vector2i):
 			get_image_uniform(color_image, 1)
 		],
 		[],
-		render_groups_count, 
-		"Overlay result"
+		render_groups_count
 	)
 	
-	rd_instance.rd.draw_command_end_label()
+	end_compute()
