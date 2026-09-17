@@ -162,6 +162,7 @@ Godot provides us with a motion-vectors texture, and it's not without its caveat
 - The user has no control over them, so they cannot be selectively disabled or enabled for individual meshes (custom motion vector support is in the works).
 - Motion vectors are not written for background and skyboxes.
 - Some render settings like enabling FSR2 drastically modify how these motion vectors behave.
+- Currently it seems that anti-aliasing is affecting the velocity texture, which leads to broken velocities at the edges of geometry, producing unwanted artifacts.
 - As of now there are glitches with objects that are spawned in, and sharp direction changes of the camera movement.
 - If the camera moves backwards really fast along a surface, you can see velocity vectors that point to a position behind the camera's near clip plane. This leads to these velocities being flipped, and in addition results in asymptotical behavior the closer these previos positions are to the near clip plane.
 - The velocity texture is affected by antialiasing, producing interpolated (and broken) velocity values at the edges of geometry.

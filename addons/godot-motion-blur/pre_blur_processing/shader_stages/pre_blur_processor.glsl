@@ -199,18 +199,9 @@ void main() {
 
 	// FSR2 alters the velocity buffer in a very specific way:
 	// 1. Static geometry has its velocity replaced with a vec2(-1).
-	// 2. Around the edges of moving geometry there are some pixels that have their velocities *divided by 2* and then added a vec2(-0.5).
-	// The following code attempts to account for that, but it would
-	// fail if valid velocities happen to land on these looked-for edge cases.
 	if (params.support_fsr2 > 0.5) {
 		if (sampled_velocity == vec2(-1)) {
 			sampled_velocity = camera_uv_change.xy;
-		}
-
-		vec2 potential_replacement = (sampled_velocity + 0.5) * 2.0;
-
-		if (dot(potential_replacement, potential_replacement) < dot(sampled_velocity, sampled_velocity)) {
-			sampled_velocity = potential_replacement;
 		}
 	}
 
@@ -258,13 +249,23 @@ void main() {
 	// adjust our expectations and say that we expect the final velocity to be no larger than the largest configured multiplier multiplied
 	// by the original velocity. So if we have 0.2 object movement, 0.4 camera movement, and 0.1 camera rotation, we should not
 	// see any velocity that's larger than 0.4 of the original velocity.
+	// The same logic can be applied in the other direction. If the resulting velocity somehow collapses to a smaller value than the
+	// minimum multiplier's fraction of the original velocity, we can fallback to such original velocity times the minimum multiplier.
 	// ---------------------------------------------------
 	float max_component_multiplier = max(params.rotation_velocity_multiplier, max(params.movement_velocity_multiplier, params.object_velocity_multiplier));
 
-	vec3 fallback_velocity = base_velocity * max_component_multiplier;
+	float min_component_multiplier = min(params.rotation_velocity_multiplier, min(params.movement_velocity_multiplier, params.object_velocity_multiplier));
 
-	if (dot(total_velocity.xy, total_velocity.xy) > dot(fallback_velocity.xy, fallback_velocity.xy)) {
-		total_velocity = fallback_velocity;
+	vec3 max_fallback_velocity = base_velocity * max_component_multiplier;
+
+	vec3 min_fallback_velocity = base_velocity * min_component_multiplier;
+
+	if (dot(total_velocity.xy, total_velocity.xy) > dot(max_fallback_velocity.xy, max_fallback_velocity.xy)) {
+		total_velocity = max_fallback_velocity;
+	}
+
+	if (dot(total_velocity.xy, total_velocity.xy) < dot(min_fallback_velocity.xy, min_fallback_velocity.xy)) {
+		total_velocity = min_fallback_velocity;
 	}
 	// ---------------------------------------------------
 	
@@ -275,7 +276,9 @@ void main() {
 	// the w component of the projected vector would be negative, and the velocity vector would be flipped.
 	// This happens with Godot's native motion vectors as well. We can detect this and flip them back, avoiding
 	// crazy artifacts.
-	total_velocity.xy *= sharp_step(params.velocity_threshold_lower, params.velocity_threshold_upper, length(total_velocity.xy * vec2(1, float(render_size.y) / float(render_size.x))) * params.motion_blur_intensity) * render_size * (view_past_ndc_cache.w < 0 ? -1 : 1) * params.motion_blur_intensity;
+	float thresholds_multiplier = sharp_step(params.velocity_threshold_lower, params.velocity_threshold_upper, length(total_velocity.xy * vec2(1, float(render_size.y) / float(render_size.x))) * params.motion_blur_intensity);
+
+	total_velocity.xy *=  thresholds_multiplier * render_size * (view_past_ndc_cache.w < 0 ? -1 : 1) * params.motion_blur_intensity;
 
 	// Now we clamp the velocity magnitudes to the tile size.
 	// We multiply the tile size by 2 because we blur the velocity
@@ -294,5 +297,6 @@ void main() {
 	imageStore(debug_2_image, uvi, vec4(texelFetch(depth_sampler, uvi, 0).x * 5));
 	imageStore(debug_3_image, uvi, vec4(-sampled_velocity, 0.0, 0.0));
 	imageStore(debug_4_image, uvi, vec4(abs(total_velocity.xy) / render_size, abs(-total_velocity.z) * 1000, depth));
+	imageStore(debug_9_image, uvi, vec4(thresholds_multiplier));
 #endif
 }

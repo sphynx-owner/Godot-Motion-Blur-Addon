@@ -38,7 +38,7 @@ const COLOR_OUTPUT_TEXTURE : StringName = "color_output"
 
 @export_group("multipliers", "multiplier_")
 
-@export_range(0, 1, 0.001) var multiplier_camera_rotation := 1.0
+@export_range(0, 1, 0.001) var multiplier_camera_rotation := 0.1
 
 @export_range(0, 1, 0.001) var multiplier_camera_movement := 1.0
 
@@ -46,7 +46,7 @@ const COLOR_OUTPUT_TEXTURE : StringName = "color_output"
 
 @export_group("velocity thresholds", "velocity_threshold_")
 
-@export_range(0.0, 100.0, 0.001) var velocity_threshold_lower := 0.0:
+@export_range(0.0, 100.0, 0.001) var velocity_threshold_lower := 1:
 	set(value):
 		velocity_threshold_lower = value
 		
@@ -55,7 +55,7 @@ const COLOR_OUTPUT_TEXTURE : StringName = "color_output"
 			velocity_threshold_upper = max(velocity_threshold_upper, velocity_threshold_lower)
 			_velocity_thresholds_setter_gate = false
 
-@export_range(0.0, 100.0, 0.001) var velocity_threshold_upper := 0.0:
+@export_range(0.0, 100.0, 0.001) var velocity_threshold_upper := 2:
 	set(value):
 		velocity_threshold_upper = value
 		
