@@ -276,7 +276,7 @@ void main() {
 	// the w component of the projected vector would be negative, and the velocity vector would be flipped.
 	// This happens with Godot's native motion vectors as well. We can detect this and flip them back, avoiding
 	// crazy artifacts.
-	float thresholds_multiplier = sharp_step(params.velocity_threshold_lower, params.velocity_threshold_upper, length(total_velocity.xy * vec2(1, float(render_size.y) / float(render_size.x))) * params.motion_blur_intensity);
+	float thresholds_multiplier = sharp_step(params.velocity_threshold_lower, params.velocity_threshold_upper, length(total_velocity.xy * vec2(float(render_size.x) / float(render_size.y), 1)) * params.motion_blur_intensity);
 
 	total_velocity.xy *=  thresholds_multiplier * render_size * (view_past_ndc_cache.w < 0 ? -1 : 1) * params.motion_blur_intensity;
 
