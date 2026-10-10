@@ -1,6 +1,8 @@
 #[compute]
 #version 450
 
+// ENGINE_VERSION
+
 #define FLT_MAX 3.402823466e+38
 #define FLT_MIN 1.175494351e-38
 #define PIXEL_RADIUS_SQUARED 0.25
@@ -40,6 +42,7 @@ struct SceneData {
 	vec4 inv_view_precision;
 #endif
 
+
 	// only used for multiview
 	mat4 projection_matrix_view[MAX_VIEWS];
 	mat4 inv_projection_matrix_view[MAX_VIEWS];
@@ -77,6 +80,11 @@ struct SceneData {
 	mat3 radiance_inverse_xform;
 
 	vec4 ambient_light_color_energy;
+
+#if defined(ENGINE_VERSION_4_8)
+	vec3 reflection_color;
+	uint pad;
+#endif
 
 	float ambient_color_sky_mix;
 	float fog_density;
