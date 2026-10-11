@@ -6,6 +6,7 @@ Table of contents:
 - [**Guide**](#guide)
     - [Installation](#installation)
     - [How To Use](#how-to-use)
+    - [How To Enable Debug View](#how-to-enable-debug-view)
     - [Additional Features](#additional-features)
 
 - [**Background**](#background)
@@ -29,13 +30,25 @@ Table of contents:
 ## Guide
 
 ### Installation
-1. Install the [Easy Compositor Addon](https://github.com/sphynx-owner/Easy-Compositor-Addon), it's a dependency.
-2. Download the code as a zip file (or download the latest release if there's any).
-3. Copy the folder `./addons/godot-motion-blur` and paste it under `res://addons/` in your Godot project.
-4. Go to **Project**->**Project Settings**->**Plugins** and ensure that the *Godot Motion Blur* plugin is enabled.
+1. Install the dependency [Easy Compositor Addon](https://github.com/sphynx-owner/Easy-Compositor-Addon), follow all its installation steps.
+2. Download this addon's latest release.
+3. Copy the folder `./addons/godot-motion-blur` and paste it under `res://addons/` in your Godot project
+4. Go to **Project** -> **Project Settings** -> **Plugins** and ensure that the **Godot Motion Blur** plugin is enabled.
 
 ### How To Use
-1. Add a **GuertinSphynxMotionBlur** compositor effect to your active compositor. It should start working right away.
+1. In the **WorldEnvironment** node (or **Camera3D**) assign a new Resource to **Compositor**.
+2. In the new **Compositor** Resource add a new Array Element and set it to a new **GuertinSphynxMotionBlur**.
+3. It should start working right away.
+
+### How To Enable Debug View
+1. In the **Compositor** Resource add a new Array Element (below the previous one) and set it to **DebugCompositorEffect**.
+2. In **GuertinSphynxMotionBlur** set **Debug** to True.
+3. In **DebugCompositorEffect** set:
+    - **Draw Debug** to True
+    - **Debug Page** to 9
+    - **Full Screen** to True
+    - **Needs Motion Vectors** to True
+4. Blur coverage should now be overlaid in red inside the game.
 
 ### Additional Features
 
@@ -49,37 +62,31 @@ They let you control how much each of these movement types contributes to the mo
 
 A common use of this feature is to lower **Camera Rotation** motion blur down to prevent nausia in players as they look around.
 
-#### Velocity Thresholds
+#### Activation Threshold
 
 This feature allows you to keep slow-movements that players should be able to track with their eyes crisp, and only blur fast movements they are not expected to track.
 
-In the `velocity thresholds` section in the inspector you will find 2 sliders: **Lower** and **Upper**.
+In the `Activation` section in the inspector you will find 2 sliders: **Threshold** and **Smoothing**.
 
-![alt text](readme_assets/velocity_thresholds_settings.png)
+![alt text](readme_assets/activation_settings.png)
 
-These allow you to establish speed thresholds below which objects stay unblurred, and when surpassed objects start getting blurred.
-
-The reason there are 2 thresholds, a lower and an upper, is to allow for a seamless transition between objects being unblurred and objects being fully blurred.
-
-Let's say your lower threshold is at 1, and your upper threshold is at 3. If an object lands on 1 or below, it is not blurred. If it lands on 2, it is half blurred, and if it lands on 3 or above, it is blurred fully.
-
-The threshold values are in screen width percentage, and are compared against the object's speed across the screen.
+These allow you to only activate motion blur above a certain speed.
 
 Let's say you are moving left very fast, in front of you is a field of green pillars:
 
 ![alt text](readme_assets/green_pillar_field_base.png)
 
-You can expect players to be able to track further pillars that visually move slower with their eyes, so let's use the velocity thresholds to only blur the fastest moving parts of the view.
+You can expect players to be able to track with their eyes the further pillars that visually move slower, so let's use `activation_threshold` to only blur the fastest moving parts of the view.
 
-Let's start by setting both lower and upper thresholds to 5:
+Let's start by setting it to 5:
 
 ![alt text](readme_assets/green_pillar_field_5_5.png)
 
-This is good progress, only the closer, fast-moving geometry is blurred, but we are still dealing with an obvious seam as both the lower and upper thresholds are on the same value, so objects are either unblurred or blurred fully, no in between.
+This is good progress. Only the closer, fast-moving geometry is blurred, but we are still dealing with an obvious seam as no activation smoothing is set, so objects are either unblurred or blurred fully, no in between.
 
 ![alt text](readme_assets/green_pillar_field_zoom_5_5.png)
 
-Let's now set the lower threshold to 3, and the upper threshold to 7, so objects that land within that range gradually start getting blurred:
+Let's now set `activation_threshold` to 3, and `activation_smoothing` to 4, so objects with speed above `activation_threshold` start to gradually get blurred and they are blurred fully at speeds larger than `activation_threshold + activation_smoothing`:
 
 ![alt text](readme_assets/green_pillar_field_3_7.png)
 
