@@ -59,6 +59,9 @@ const COLOR_OUTPUT_TEXTURE : StringName = "color_output"
 
 @export var transparent_bg: bool = false
 
+## WARNING: this is a testing utility, should not be enabled for regular use.
+@export var disable_activation_normalization: bool = false
+
 @export_storage var pre_blur_processor_stage: RDShaderFile = preload("res://addons/godot-motion-blur/pre_blur_processing/shader_stages/pre_blur_processor.glsl")
 
 var _properties_to_remove: Dictionary[String, bool] = {

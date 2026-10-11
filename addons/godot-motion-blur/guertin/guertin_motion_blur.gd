@@ -38,7 +38,7 @@ func _enhanced_render_callback(render_size : Vector2i):
 	
 	var reference_delta: float = 1.0 / 60;
 	
-	var framerate_normalization_factor: float = reference_delta / delta_time
+	var framerate_normalization_factor: float = 1.0 if disable_activation_normalization else reference_delta / delta_time
 	
 	var max_x_size: Vector2i = EasyRenderingUtils.divide_vector2i_by_tile_size(render_size, Vector2i(tile_size, 1))
 	
