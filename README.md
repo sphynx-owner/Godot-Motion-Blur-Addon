@@ -172,7 +172,6 @@ Godot provides us with a motion-vectors texture, and it's not without its caveat
 - Currently it seems that anti-aliasing is affecting the velocity texture, which leads to broken velocities at the edges of geometry, producing unwanted artifacts.
 - As of now there are glitches with objects that are spawned in, and sharp direction changes of the camera movement.
 - If the camera moves backwards really fast along a surface, you can see velocity vectors that point to a position behind the camera's near clip plane. This leads to these velocities being flipped, and in addition results in asymptotical behavior the closer these previos positions are to the near clip plane.
-- The velocity texture is affected by antialiasing, producing interpolated (and broken) velocity values at the edges of geometry.
 
 I am solving some of these issues in this addon.
 
@@ -301,7 +300,7 @@ In the current implementation, this stage is also in charge of other nice-to-hav
 * It fixes broken velocities when FSR2 is enabled.
 * It fixes broken velocities when the camera moves backwards very fast.
 * It clamps velocities' length to be no larger than the span of 2 tiles.
-* It generate Z velocities (in view space) for static environment, and stores them in the blue channel.
+* It generate Z velocities (in ndc space) for static environment, and stores them in the blue channel.
 * It stores depth in the alpha channel to be used with the generated Z velocities (one less texture sampling on the motion blur stage).
 
 ### Tile Max X Stage
